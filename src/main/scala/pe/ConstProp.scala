@@ -1,11 +1,12 @@
 package pe
-import ast.*
+import ast._
 
 import scala.collection.mutable
 
-object ConstProp:
+class ConstProp:
+  val nameValMap = mutable.HashMap.empty[String, Exp]
   def visit(e: Exp): Exp =
-    val nameValMap = mutable.HashMap.empty[String, Exp]
+    
 
     e match
       case BinOp(lhs, op, rhs) => BinOp(visit(lhs), op, visit(rhs))
