@@ -36,5 +36,5 @@ case class Build(fn: Exp, size: Exp) extends Exp
 
 case class Arr(elements: List[Exp]) extends Exp
 case class ReadArr(array: Exp, index: Exp) extends Exp
-case object unit extends Exp
+case object UnitE extends Exp
 

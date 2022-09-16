@@ -1,6 +1,6 @@
 package pe
 
-import ast.{IntLiteral, *}
+import ast.*
 
 import scala.collection.mutable
 
@@ -47,8 +47,8 @@ class PartialEvaluator:
       case If(cond, bThen, bElse) =>
         eval(cond, ctx) match
           case IntLiteral(int) => if int != 0 then eval(bThen, ctx) else eval(bElse, ctx)
-          case _ => If(cond, bThen, bElse)
-          // TODO This is conservative. A more appropriate approach is to visit both branches if they have no side effect
+          case _ => If(cond, eval(bThen, ctx), eval(bElse, ctx)) // this is safe since only functions have side effect, and those ones are not evaluated
+
 
       case Fn(args, body, restricted, simplified, hasSideEffect) =>
         if restricted then e
@@ -73,7 +73,7 @@ class PartialEvaluator:
 
       case Let(name, e) =>
         ctx.put(name, eval(e, ctx))
-        unit
+        UnitE
 
       case ExpList(exps) =>
         for (i <- 0 until exps.length-2)
@@ -97,7 +97,7 @@ class PartialEvaluator:
           case (Arr(elements), IntLiteral(int)) => elements(int)
           case (array_, index_) => ReadArr(array_, index_)
 
-      case unit => unit
+      case UnitE => UnitE
 
 case class DynamicSizeException(private val message: String = "The array size is dynamic.",
                                  private val cause: Throwable = None.orNull,
