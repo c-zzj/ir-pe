@@ -18,10 +18,7 @@ case class IntLiteral(int: Int) extends Literal
 case class Var(name: String) extends Exp
 
 case class If(cond: Exp, bThen: Exp, bElse: Exp) extends Exp
-
-case class Fn(params: List[String], body: Exp) extends Exp
-
-case class RestrictedFn(params: List[String], body: Exp) extends Exp
+case class Fn(params: List[String], body: Exp, isRestricted: Boolean = false, isSimplified: Boolean = false, hasSideEffect: Boolean = false) extends Exp
 
 case class Rec(name: String, fn: Fn) extends Exp
 
@@ -37,4 +34,3 @@ case class Arr(elements: List[Exp]) extends Exp
 case class ReadArr(array: Exp, index: Exp) extends Exp
 case object unit extends Exp
 
-trait WithSideEffect

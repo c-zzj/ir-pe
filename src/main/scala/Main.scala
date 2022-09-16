@@ -10,5 +10,5 @@ object Main {
     println(a.lift(2))
     val list = List.range(0,3)
     println(list.last)
-    
+
 }

@@ -50,23 +50,25 @@ class PartialEvaluator:
           case _ => If(cond, bThen, bElse)
           // TODO This is conservative. A more appropriate approach is to visit both branches if they have no side effect
 
-      case Fn(args, body) => Fn(args, eval(body, ctx))
+      case Fn(args, body, restricted, simplified, hasSideEffect) =>
+        if restricted then e
+        else if simplified then e
+        else Fn(args, eval(body, ctx), restricted, true, hasSideEffect)
 
-      case RestrictedFn(args, body) => RestrictedFn(args, body)
-
-      case Rec(name, fn) =>
+      case Rec(name, Fn(args, body, r, s, h)) =>
         val ctx_ =  mutable.HashMap.from(ctx)
-        ctx_.put(name, RestrictedFn(fn.params, fn.body))
-        Rec(name, eval(fn, ctx_).asInstanceOf[Fn])
+        ctx_.put(name, Fn(args, body, true, s, h))
+        Rec(name, eval(Fn(args, body, r, s, h), ctx_).asInstanceOf[Fn])
 
       case Apply(fn, args) =>
         // TODO note that here redundant args are still evaluated
         (eval(fn, ctx), args.map((a: Exp) => eval(a, ctx))) match
-          case (RestrictedFn(params, body), args_) => Apply(RestrictedFn(params, body), args_)
-          case (Fn(params, body), args_) =>
-            val ctx_ = mutable.HashMap.from(ctx)
-            for (i <- params.indices) if i < args_.length then ctx_.put(params(i), args_(i))
-            eval(body, ctx)
+          case (Fn(params, body, restricted, s, h), args_) =>
+            if restricted then Apply(Fn(params, body, restricted, s, h), args_)
+            else
+              val ctx_ = mutable.HashMap.from(ctx)
+              for (i <- params.indices) if i < args_.length then ctx_.put(params(i), args_(i))
+              eval(body, ctx)
           case (fn_, args_) => Apply(fn_, args_)
 
       case Let(name, e) =>
