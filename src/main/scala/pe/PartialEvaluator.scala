@@ -7,7 +7,6 @@ import scala.collection.mutable
 class PartialEvaluator:
   type StaticData = IntLiteral | Arr | Fn | Rec
 
-  case class Node(e: Exp, isEvaluated: Boolean = false)
   def intToBool(int: Int): Boolean = if int == 0 then false else true
   def boolToInt(bool: Boolean): Int = if bool then 1 else 0
 
@@ -15,87 +14,118 @@ class PartialEvaluator:
 
   def intOr(a: Int, b: Int): Int = if a != 0 then a else if b != 0 then b else 0
 
+  def visit(e: Exp): Exp = eval(e, mutable.HashMap.empty)
   def eval(e: Exp, ctx: mutable.HashMap[String, Exp]): Exp =
     e match
-      case BinOp(lhs, op, rhs) =>
-        (eval(lhs, ctx), eval(rhs, ctx)) match
-          case (IntLiteral(l), IntLiteral(r)) =>
-            op match
+      case e: BinOp =>
+        (eval(e.lhs, ctx), eval(e.rhs, ctx)) match
+          case (lhs: IntLiteral, rhs: IntLiteral) =>
+            val l: Int = lhs.int
+            val r: Int = rhs.int
+            e.op match {
               case Op.ADD => IntLiteral(l + r)
               case Op.SUB => IntLiteral(l - r)
               case Op.MUL => IntLiteral(l * r)
               case Op.DIV => IntLiteral(l / r)
               case Op.MOD => IntLiteral(l % r)
-              case Op.GT => IntLiteral((l >= r).asInstanceOf[Int])
-              case Op.LT => IntLiteral((l <= r).asInstanceOf[Int])
-              case Op.GE => IntLiteral((l > r).asInstanceOf[Int])
-              case Op.LE => IntLiteral((l < r).asInstanceOf[Int])
-              case Op.NE => IntLiteral((l != r).asInstanceOf[Int])
-              case Op.EQ => IntLiteral((l == r).asInstanceOf[Int])
+              case Op.GT => IntLiteral(boolToInt(l >= r))
+              case Op.LT => IntLiteral(boolToInt(l <= r))
+              case Op.GE => IntLiteral(boolToInt(l > r))
+              case Op.LE => IntLiteral(boolToInt(l < r))
+              case Op.NE => IntLiteral(boolToInt(l != r))
+              case Op.EQ => IntLiteral(boolToInt(l == r))
               case Op.OR => IntLiteral(boolToInt(intToBool(l) || intToBool(r)))
               case Op.AND => IntLiteral(boolToInt(intToBool(l) && intToBool(r)))
+            }
+          case (lhs: ExpList, rhs: ExpList) =>
+            val newList = mutable.ListBuffer[Exp]()
+            newList.addAll(lhs.exps)
+            newList.remove(newList.size - 1)
+            newList.addAll(rhs.exps)
+            newList.remove(newList.size - 1)
+            newList.addOne(eval(BinOp(lhs.exps.last, e.op, rhs.exps.last), ctx))
+            ExpList(newList.toList)
+          case (lhs: ExpList, rhs: Exp) =>
+            val newList = mutable.ListBuffer[Exp]()
+            for (i <- lhs.exps.indices) newList.addOne(if i < lhs.exps.size - 1 then lhs.exps(i) else eval(BinOp(lhs.exps(i), e.op, rhs), ctx))
+            ExpList(newList.toList)
+          case (lhs: Exp, rhs: ExpList) =>
+            val newList = mutable.ListBuffer[Exp]()
+            for (i <- rhs.exps.indices) newList.addOne(if i < rhs.exps.size - 1 then rhs.exps(i) else eval(BinOp(lhs, e.op, rhs.exps(i)), ctx))
+            ExpList(newList.toList)
+          case (lhs: Exp, rhs: Exp) => BinOp(lhs, e.op, rhs)
 
-      case StrLiteral(str) => Arr(str.map(c => IntLiteral(c.asInstanceOf[Int])).toList)
-      case IntLiteral(_) => e
-      case Var(name) =>
-        val value = ctx.get(name)
+      case e: StrLiteral => Arr(e.str.map(c => IntLiteral(c.asInstanceOf[Int])).toList)
+      case e: IntLiteral => e
+      case e: Var =>
+        val value = ctx.get(e.name)
         value match
           case Some(data: StaticData) => data
           case Some(_: Exp) => e
           case None => e
 
-      case If(cond, bThen, bElse) =>
-        eval(cond, ctx) match
-          case IntLiteral(int) => if int != 0 then eval(bThen, ctx) else eval(bElse, ctx)
-          case _ => If(cond, eval(bThen, ctx), eval(bElse, ctx)) // this is safe since only functions have side effect, and those ones are not evaluated
+      case e: If =>
+        eval(e.cond, ctx) match
+          case i: IntLiteral => if i.int != 0 then eval(e.bThen, ctx) else eval(e.bElse, ctx)
+          case _ => If(e.cond, eval(e.bThen, ctx), eval(e.bElse, ctx)) // this is safe since only functions have side effect, and those ones are not evaluated
 
 
-      case Fn(args, body, restricted, simplified, hasSideEffect) =>
-        if restricted then e
-        else if simplified then e
-        else Fn(args, eval(body, ctx), restricted, true, hasSideEffect)
+      case e: Fn =>
+        if e.isRestricted || e.isSimplified then e
+        else Fn(e.params, eval(e.body, ctx), e.isRestricted, true, e.hasSideEffect)
 
-      case Rec(name, Fn(args, body, r, s, h)) =>
+      case e: Rec =>
+        val fn = e.fn
         val ctx_ =  mutable.HashMap.from(ctx)
-        ctx_.put(name, Fn(args, body, true, s, h))
-        Rec(name, eval(Fn(args, body, r, s, h), ctx_).asInstanceOf[Fn])
+        ctx_.put(e.name, Fn(fn.params, fn.body, true, fn.isSimplified, fn.hasSideEffect))
+        Rec(e.name, eval(fn, ctx_).asInstanceOf[Fn])
 
-      case Apply(fn, args) =>
+      case e: Apply =>
         // TODO note that here redundant args are still evaluated
-        (eval(fn, ctx), args.map((a: Exp) => eval(a, ctx))) match
-          case (Fn(params, body, restricted, s, h), args_) =>
-            if restricted then Apply(Fn(params, body, restricted, s, h), args_)
+        (eval(e.fn, ctx), e.args.map((a: Exp) => eval(a, ctx))) match {
+          case (fn: Fn, args_) =>
+            if fn.isRestricted then Apply(fn, args_)
             else
               val ctx_ = mutable.HashMap.from(ctx)
-              for (i <- params.indices) if i < args_.length then ctx_.put(params(i), args_(i))
-              eval(body, ctx)
-          case (fn_, args_) => Apply(fn_, args_)
+              for (i <- fn.params.indices) if i < args_.length then ctx_.put(fn.params(i), args_(i))
+              eval(fn.body, ctx)
 
-      case Let(name, e) =>
-        ctx.put(name, eval(e, ctx))
-        UnitE
+          case (fn, args_) => Apply(fn, args_)
+        }
 
-      case ExpList(exps) =>
-        for (i <- 0 until exps.length-2)
-          eval(exps(i), ctx)
-        eval(exps.last, ctx)
+      case e: Let =>
+        ctx.put(e.name, eval(e.value, ctx))
+        e
 
-      case Arr(_) => e
+      /*
+      Evaluate each expression in the list and flatten the list
+      */
+      case e: ExpList =>
+        val flattened = mutable.ListBuffer[Exp]()
+        e.exps.map(e_ => eval(e_, ctx)).foreach((ele: Exp) => ele match
+          case l : ExpList => flattened.addAll(l.exps)
+          case other: Exp => flattened.addOne(other)
+        )
+        if flattened.size == 1 then flattened(1) else ExpList(flattened.toList)
 
-      case Build(fn, size) =>
-        (eval(fn, ctx), eval(size, ctx)) match
-          case (fn_, IntLiteral(size_)) =>
+      case e: Arr => e
+
+      case e: Build =>
+        (eval(e.fn, ctx), eval(e.size, ctx)) match {
+          case (fn, size_ : IntLiteral) =>
             Arr(
-              List.range(0, size_).map(
-                (i: Int) => eval(Apply(fn_, List(IntLiteral(i))), ctx)
+              List.range(0, size_.int).map(
+                (i: Int) => eval(Apply(fn, List(IntLiteral(i))), ctx)
               )
             )
-          case _ => throw DynamicSizeException(size=size)
+          case _ => throw DynamicSizeException(size = e.size)
+        }
 
-      case ReadArr(array, index) =>
-        (eval(array, ctx), eval(index, ctx)) match
-          case (Arr(elements), IntLiteral(int)) => elements(int)
-          case (array_, index_) => ReadArr(array_, index_)
+      case e: ReadArr =>
+        (eval(e.array, ctx), eval(e.index, ctx)) match {
+          case (array: Arr, index: IntLiteral) => array.elements(index.int)
+          case (array, index) => ReadArr(array, index)
+        }
 
       case UnitE => UnitE
 

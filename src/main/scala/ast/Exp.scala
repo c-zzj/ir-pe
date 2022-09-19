@@ -7,34 +7,32 @@ trait Exp
 enum Op extends ASTNode:
   case ADD, SUB, MUL, DIV, MOD, GT, LT, GE, LE, NE, EQ, OR, AND
 
-case class BinOp(lhs: Exp, op: Op, rhs: Exp) extends Exp
+class BinOp(val lhs: Exp, val op: Op, val rhs: Exp) extends Exp
 
-class Literal extends Exp
+class StrLiteral(val str: String) extends Exp
 
-case class StrLiteral(str: String) extends Exp
+class IntLiteral(val int: Int) extends Exp
 
-case class IntLiteral(int: Int) extends Literal
+class Var(val name: String) extends Exp
 
-case class Var(name: String) extends Exp
+class If(val cond: Exp, val bThen: Exp, val bElse: Exp) extends Exp
+class Fn(val params: List[String],
+         val body: Exp,
+         val isRestricted: Boolean = false,
+         val isSimplified: Boolean = false,
+         val hasSideEffect: Boolean = false) extends Exp
 
-case class If(cond: Exp, bThen: Exp, bElse: Exp) extends Exp
-case class Fn(params: List[String],
-              body: Exp,
-              isRestricted: Boolean = false,
-              isSimplified: Boolean = false,
-              hasSideEffect: Boolean = false) extends Exp
+class Rec(val name: String, val fn: Fn) extends Exp
 
-case class Rec(name: String, fn: Fn) extends Exp
+class Apply(val fn: Exp, val args: List[Exp]) extends Exp
 
-case class Apply(fn: Exp, args: List[Exp]) extends Exp
+class Let(val name: String, val value: Exp) extends Exp
 
-case class Let(name: String, e: Exp) extends Exp
+class ExpList(val exps: List[Exp]) extends Exp
 
-case class ExpList(exps: List[Exp]) extends Exp
+class Build(val fn: Exp, val size: Exp) extends Exp
 
-case class Build(fn: Exp, size: Exp) extends Exp
-
-case class Arr(elements: List[Exp]) extends Exp
-case class ReadArr(array: Exp, index: Exp) extends Exp
+class Arr(val elements: List[Exp]) extends Exp
+class ReadArr(val array: Exp, val index: Exp) extends Exp
 case object UnitE extends Exp
 
