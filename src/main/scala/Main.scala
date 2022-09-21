@@ -7,7 +7,8 @@ object Main {
     class X(val int: Int) extends T
     class Y(val int: Int) extends T
 
-    val l = List(1)
-    val b = List(2,3)
-    print(l.::(1))
+    val l: T = X(3)
+    l match
+      case a_ :X => print(1)
+      case b:Y => print(2)
 }

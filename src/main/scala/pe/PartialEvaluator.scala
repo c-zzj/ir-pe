@@ -64,10 +64,19 @@ class PartialEvaluator:
           case Some(_: Exp) => e
           case None => e
 
-      case e: If =>
-        eval(e.cond, ctx) match
-          case i: IntLiteral => if i.int != 0 then eval(e.bThen, ctx) else eval(e.bElse, ctx)
-          case _ => If(e.cond, eval(e.bThen, ctx), eval(e.bElse, ctx)) // this is safe since only functions have side effect, and those ones are not evaluated
+      case e: If => e.cond match {
+        case l: ExpList =>
+          val newList = mutable.ListBuffer[Exp]()
+          newList.addAll(l.exps)
+          newList.remove(newList.size - 1)
+          newList.addOne(If(l.exps.last, e.bThen, e.bElse))
+          eval(ExpList(newList.toList))
+        case _: Exp =>
+          eval(e.cond, ctx) match {
+            case i: IntLiteral => if i.int != 0 then eval(e.bThen, ctx) else eval(e.bElse, ctx)
+            case _ => If(e.cond, eval(e.bThen, ctx), eval(e.bElse, ctx)) // this is safe since only functions have side effect, and those ones are not evaluated
+          }
+        }
 
 
       case e: Fn =>
