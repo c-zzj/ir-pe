@@ -70,7 +70,7 @@ class PartialEvaluator:
           newList.addAll(l.exps)
           newList.remove(newList.size - 1)
           newList.addOne(If(l.exps.last, e.bThen, e.bElse))
-          eval(ExpList(newList.toList))
+          eval(ExpList(newList.toList), ctx)
         case _: Exp =>
           eval(e.cond, ctx) match {
             case i: IntLiteral => if i.int != 0 then eval(e.bThen, ctx) else eval(e.bElse, ctx)

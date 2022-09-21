@@ -11,12 +11,16 @@ class DeadCodeEliminator:
   case class Exp_(e: Exp | List[Exp_], isLive: Boolean)
 
   def visit(e: Exp): Exp =
-    val numLiveBefore = liveExps.size
     mark_forward(e)
+    mark_backward(e)
+    sweep(e)
+
+  def mark_backward(e: Exp): Unit =
+    val numLiveBefore = liveExps.size
     mark_let(e)
     mark_if(e)
     val numLiveAfter = liveExps.size
-    if numLiveBefore == numLiveAfter then sweep(e) else visit(e)
+    if numLiveBefore != numLiveAfter then mark_backward(e)
 
   def mark_forward(e: Exp): Unit =
     e match
