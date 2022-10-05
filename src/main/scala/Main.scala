@@ -11,4 +11,8 @@ object Main {
     l match
       case a_ :X => print(1)
       case b:Y => print(2)
+
+    for (i <- 10 to 1 by -1){
+      print(i)
+    }
 }
