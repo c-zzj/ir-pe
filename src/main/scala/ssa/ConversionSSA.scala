@@ -2,7 +2,7 @@ package ssa
 
 import scala.collection.mutable
 
-class ConversionSSA(program: Stmt) {
+class ConversionSSA(program: Block) {
   private def find_global_vars(): Unit =
     for (block <- cfg.blocks) {
       val varkill = mutable.HashSet.empty[String]
@@ -22,19 +22,19 @@ class ConversionSSA(program: Stmt) {
 
     }
 
-  private def computeIDomMap(): mutable.Map[BlockNode, BlockNode] =
-    val roots: mutable.ListBuffer[BlockNode] = mutable.ListBuffer.empty[BlockNode]
-    roots.addOne(cfg.topLevelBlock)
-    cfg.funBlockMap.values.foreach(roots.addOne)
-
+  private def computeIDomMaps(): (mutable.Map[BlockNode, BlockNode], mutable.Map[BlockNode, mutable.ArrayDeque[BlockNode]]) =
     val iDomMap: mutable.Map[BlockNode, BlockNode] = mutable.HashMap.empty[BlockNode, BlockNode]
-    val iDomMap_ = mutable.HashMap.empty[BlockNode, mutable.ListBuffer[BlockNode]]
+    val iDomReverseMap = mutable.HashMap.empty[BlockNode, mutable.ArrayDeque[BlockNode]]
+    cfg.blocks.foreach(b => iDomReverseMap.put(b, mutable.ArrayDeque.empty[BlockNode]))
+
+    // map from each block and its dominators, ordered from furthest to nearest
+    val iDomMap_ = mutable.HashMap.empty[BlockNode, mutable.ArrayDeque[BlockNode]]
 
     def traverse(cur: BlockNode): Unit =
-      val curAncestors = iDomMap_.getOrElseUpdate(cur, mutable.ListBuffer.empty[BlockNode])
+      val curAncestors = iDomMap_.getOrElseUpdate(cur, mutable.ArrayDeque.empty[BlockNode])
       val curAncestorSet = mutable.HashSet.from(curAncestors)
       for (child <- cur.successors) {
-        val childAncestors = iDomMap_.getOrElseUpdate(child, mutable.ListBuffer.empty[BlockNode])
+        val childAncestors = iDomMap_.getOrElseUpdate(child, mutable.ArrayDeque.empty[BlockNode])
         if childAncestors.isEmpty then
           childAncestors.addAll(curAncestors).addOne(cur)
         else
@@ -46,12 +46,16 @@ class ConversionSSA(program: Stmt) {
       }
 
     roots.foreach(traverse)
-    iDomMap_.foreach((b, dominators) => iDomMap.put(b, dominators.last))
-    iDomMap
+    iDomMap_.foreach((b, dominators) => {
+      iDomMap.put(b, dominators.last)
+      val children = iDomReverseMap.getOrElseUpdate(dominators.last, throw IllegalStateException())
+      children.addOne(b)
+    })
+    (iDomMap, iDomReverseMap)
 
-  private def computeDominatorFrontiers(): mutable.Map[BlockNode, mutable.ListBuffer[BlockNode]] =
-    val DFMap = mutable.HashMap.empty[BlockNode, mutable.ListBuffer[BlockNode]]
-    cfg.blocks.foreach(b => DFMap.put(b, mutable.ListBuffer.empty[BlockNode]))
+  private def computeDominatorFrontiers(): mutable.Map[BlockNode, mutable.ArrayDeque[BlockNode]] =
+    val DFMap = mutable.HashMap.empty[BlockNode, mutable.ArrayDeque[BlockNode]]
+    cfg.blocks.foreach(b => DFMap.put(b, mutable.ArrayDeque.empty[BlockNode]))
     cfg.blocks.foreach(b =>
       if b.predecessors.size > 1 then
         b.predecessors.foreach(p =>
@@ -65,17 +69,103 @@ class ConversionSSA(program: Stmt) {
     )
     DFMap
 
+  private def insertPhiFunctions(): Unit =
+    globals.foreach(x =>
+      val workList = mutable.HashSet.empty[BlockNode]
+      this.nameBlockMap.get(x) match
+        case Some(blocks) => workList.addAll(blocks)
+        case None =>;
+      while (workList.nonEmpty) {
+        val b = workList.head
+        workList.remove(b)
+        for (d <- DFMap.getOrElse(b, mutable.ArrayDeque.empty[BlockNode])){
+          // find the content corresponding to d's block, and then insert phi node
+          val namePhiMap = blockNodePhiMap.getOrElseUpdate(d, mutable.HashMap.empty[String, Phi])
+          namePhiMap.get(x) match
+            case Some(_: Phi) => ; // the var name will be filled in the renaming phase
+            case None =>
+              val phi = Phi()
+              namePhiMap.put(x, phi)
+              cfg.blockContentMap.getOrElseUpdate(d.block, LinkedSet[Stmt]()).insertAfter(d.prevIf, Let(x, phi))
+
+          workList.add(d)
+        }
+      }
+    )
+
+    // replace the contents of each block
+    for ((block, linkedSet) <- cfg.blockContentMap) {
+      block.stmts = linkedSet.toList
+    }
+
+  private def rename(): Unit =
+    val nameCounter = mutable.HashMap.empty[String, Integer]
+    val nameStack = mutable.HashMap.empty[String, mutable.Stack[Option[Integer]]]
+
+    def newName(n: String): String =
+      val i = nameCounter.getOrElseUpdate(n, 1)
+      nameCounter.put(n, i+1)
+      val name = n + "_" + i
+      nameStack.getOrElseUpdate(n, mutable.Stack.empty[Option[Integer]]).push(Some(i))
+      name
+
+    def rewrite(e: Exp): Unit =
+      e match
+        case _: Rec => ;
+        case _: Fn => ;
+        case e: BinOp => rewrite(e.lhs); rewrite(e.rhs)
+        case _: StrLiteral => ;
+        case _: IntLiteral => ;
+        case e: Var =>
+          nameStack.get(e.name) match {
+            case None => ;
+            case Some(stack: mutable.Stack[Option[Integer]]) => ;
+          }
+        case UnitE => ;
+        case e: Apply => rewrite(e.fn); e.args.foreach(e_ => rewrite(e_))
+        case e: Build => rewrite(e.fn); rewrite(e.size);
+        case e: Arr => e.elements.foreach(e_ => rewrite(e_))
+        case e: ReadArr => rewrite(e.array); rewrite(e.index);
+      ;
+
+    def rename(blockNode: BlockNode): Unit =
+      blockNode.elements.foreach((s: Stmt) =>
+        s match
+          case s: Let =>
+            rewrite(s.value);
+            s.name = newName(s.name)
+          case s: If => rewrite(s.cond)
+          case s: Return => rewrite(s.value)
+          case s: Exp => rewrite(s)
+      )
+
+    roots.foreach(rename)
+
   val cfg: ControlFlowGraph = ControlFlowGraph(program)
 
   val nameBlockMap: mutable.Map[String, mutable.Set[BlockNode]] = mutable.HashMap.empty[String, mutable.Set[BlockNode]]
 
   val globals: mutable.Set[String] = mutable.HashSet.empty[String]
 
+  val roots: mutable.ArrayDeque[BlockNode] = mutable.ArrayDeque.empty[BlockNode]
+  roots.addOne(cfg.topLevelBlock)
+  cfg.funBlockMap.values.foreach(roots.addOne)
+
   find_global_vars()
-  val iDomMap: mutable.Map[BlockNode, BlockNode] = computeIDomMap()
 
-  val DFMap: mutable.Map[BlockNode, mutable.ListBuffer[BlockNode]] = computeDominatorFrontiers()
+  // iDomMap: map of each block node and its immediate dominator
+  // iDomReverseMap: map of each block node and blocks that have this block as their immediate dominator
+  val (iDomMap: mutable.Map[BlockNode, BlockNode],
+  iDomReverseMap: mutable.Map[BlockNode, mutable.ArrayDeque[BlockNode]]) = computeIDomMaps()
 
+  // map of each block node and its dominator frontiers
+  val DFMap: mutable.Map[BlockNode, mutable.ArrayDeque[BlockNode]] = computeDominatorFrontiers()
+
+  // store the unique phi functions inserted to each block node
+  private val blockNodePhiMap = mutable.HashMap.empty[BlockNode, mutable.HashMap[String, Phi]]
+  insertPhiFunctions()
+
+  rename()
 }
 
 def findVarsUsed(e: Exp): mutable.Set[String] =

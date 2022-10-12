@@ -15,4 +15,6 @@ object Main {
     for (i <- 10 to 1 by -1){
       print(i)
     }
+
+    print(List(1,2,3))
 }
