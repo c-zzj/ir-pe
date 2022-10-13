@@ -1,6 +1,7 @@
 package ssa
 
 import scala.collection.mutable
+import ssa.PPrint
 
 class ConversionSSA(program: Block) {
   private def find_global_vars(): Unit =
@@ -70,13 +71,12 @@ class ConversionSSA(program: Block) {
 
   private def computeDominatorFrontiers(): mutable.Map[BlockNode, mutable.ArrayDeque[BlockNode]] =
     val DFMap = mutable.HashMap.empty[BlockNode, mutable.ArrayDeque[BlockNode]]
-    cfg.blocks.foreach(b => DFMap.put(b, mutable.ArrayDeque.empty[BlockNode]))
     cfg.blocks.foreach(b =>
       if b.predecessors.size > 1 then
         b.predecessors.foreach(p =>
           var runner = p
           while (runner != iDomMap.getOrElse(b, throw IllegalStateException("block "+b.toString+" should have an iDOM"))){
-            val runnerDF = DFMap.getOrElse(runner, throw IllegalStateException("DF of "+runner.toString+" should have been initialized"))
+            val runnerDF = DFMap.getOrElseUpdate(runner, mutable.ArrayDeque.empty[BlockNode])
             runnerDF.addOne(b)
             runner = iDomMap.getOrElse(runner, throw IllegalStateException("block "+runner.toString+" should have an iDOM"))
           }
@@ -120,7 +120,7 @@ class ConversionSSA(program: Block) {
     val nameStack = mutable.HashMap.empty[String, mutable.Stack[Integer]]
 
     def newName(n: String): String =
-      val i = nameCounter.getOrElseUpdate(n, 1)
+      val i = nameCounter.getOrElseUpdate(n, 0)
       nameCounter.put(n, i+1)
       val name = n + "_" + i
       nameStack.getOrElseUpdate(n, mutable.Stack.empty[Integer]).push(i)
@@ -183,6 +183,11 @@ class ConversionSSA(program: Block) {
           case _: Exp => ;
       )
 
+    roots.foreach((b: BlockNode) =>
+      b match
+        case b: FnBlockNode => b.fn.params = b.fn.params.map(curName)
+        case _ => ;
+    )
     roots.foreach(rename)
 
   val cfg: ControlFlowGraph = ControlFlowGraph(program)
@@ -208,7 +213,6 @@ class ConversionSSA(program: Block) {
   // store the unique phi functions inserted to each block node
   private val blockNodePhiMap = mutable.HashMap.empty[BlockNode, mutable.HashMap[String, Phi]]
   insertPhiFunctions()
-
   rename()
 }
 

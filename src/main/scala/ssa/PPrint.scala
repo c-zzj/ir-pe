@@ -1,7 +1,7 @@
-package util
+package ssa
 
-import ssa.Stmt
-import ssa.BlockNode
+import ssa.{BlockNode, Stmt}
+import scala.collection.mutable
 
 /**
  * Based on:

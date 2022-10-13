@@ -50,7 +50,7 @@ class ControlFlowGraph(program: Block) {
             case _: Return => return b
             case _ => ;
         }
-        curBlockNode
+        b
       case e: If =>
         applyToFn(e.cond, createBlockForFn)
 
@@ -70,28 +70,12 @@ class ControlFlowGraph(program: Block) {
 
         val after = BlockNode(curBlockNode.block)
         blocks.add(after)
-        if b1Last.elements.isEmpty then
-          for (b <- b1Last.predecessors){
-            b.successors.remove(b1Last)
-            b.successors.addOne(after)
-            after.predecessors.addOne(b)
-            blocks.remove(b1Last)
-          }
-          b1Last.predecessors.clear()
-        else
-          b1Last.successors.addOne(after)
-          after.predecessors.addOne(b1Last)
-        if b2Last.elements.isEmpty then
-          for (b <- b2Last.predecessors) {
-            b.successors.remove(b1Last)
-            b.successors.addOne(after)
-            after.predecessors.addOne(b)
-            blocks.remove(b2Last)
-          }
-          b2Last.predecessors.clear()
-        else
-          b2Last.successors.addOne(after)
-          after.predecessors.addOne(b2Last)
+
+        b1Last.successors.addOne(after)
+        after.predecessors.addOne(b1Last)
+
+        b2Last.successors.addOne(after)
+        after.predecessors.addOne(b2Last)
 
         after.prevIf = Some(e)
         after

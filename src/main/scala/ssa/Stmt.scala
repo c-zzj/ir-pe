@@ -8,7 +8,9 @@ trait Stmt
 
 class Let(var name: String, var value: Exp) extends Stmt
 
-class Block(var stmts: List[Stmt]) extends Stmt
+class Block(var stmts: List[Stmt]) extends Stmt:
+  def this(stmts: Stmt*) =
+    this(stmts.toList)
 
 class If(var cond: Exp, val bThen: Block, val bElse: Block) extends Stmt
 
@@ -28,7 +30,7 @@ class IntLiteral(val int: Int) extends Exp
 
 class Var(var name: String) extends Exp
 
-class Fn(val params: List[String],
+class Fn(var params: List[String],
          val body: Block,
          val isRestricted: Boolean = false,
          val isSimplified: Boolean = false,
