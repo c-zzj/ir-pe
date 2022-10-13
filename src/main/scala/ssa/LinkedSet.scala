@@ -59,6 +59,11 @@ class LinkedSet[A] extends mutable.Iterable[A]{
     insertBefore(tail_, newTail)
     true
 
+  /**
+   *
+   * @param coll collection to be added
+   */
+  def addAll(coll: IterableOnce[A]): Unit = coll.iterator.foreach(add)
 
   /**
    * Insert an element before another element, if the element to insert does not exist and the other element exists.
@@ -100,7 +105,7 @@ class LinkedSet[A] extends mutable.Iterable[A]{
         true
 
 
-  def remove(node: Node): Unit =
+  def removeNode(node: Node): Unit =
     val prev = node.prev
     val next = node.next
     prev.next = next
@@ -120,10 +125,19 @@ class LinkedSet[A] extends mutable.Iterable[A]{
     nodeMap.get(element) match
       case None => false
       case Some(node: Node) =>
-        remove(node)
+        removeNode(node)
         nodeMap.remove(element)
         size_ -= 1
         true
+
+  def removeHead(): A =
+    if size_ == 0 then throw java.util.NoSuchElementException()
+    head_.next.value match
+      case None => throw IllegalStateException("Internal error: null value inside element node!")
+      case Some(v: A) =>
+        removeNode(head_.next)
+        size_ -= 1
+        v
 
   def contains(element: A): Boolean = nodeMap.contains(element)
 

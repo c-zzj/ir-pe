@@ -31,7 +31,7 @@ class ControlFlowGraph(program: Block) {
   def createBlocks(e: Stmt, curBlockNode: BlockNode): BlockNode =
     val createBlockForFn: Fn => Unit = (fn: Fn) => {
       val new_block = FnBlockNode(fn.body, fn)
-      blocks.addOne(new_block)
+      blocks.add(new_block)
       funBlockMap.put(fn, new_block)
       createBlocks(fn.body, new_block)
     }
@@ -59,31 +59,41 @@ class ControlFlowGraph(program: Block) {
         val b1 = BlockNode(e.bThen)
         curBlockNode.successors.addOne(b1)
         b1.predecessors.addOne(curBlockNode)
-        blocks.addOne(b1)
+        blocks.add(b1)
         val b1Last = createBlocks(e.bThen, b1)
 
         val b2 = BlockNode(e.bElse)
         curBlockNode.successors.addOne(b2)
         b2.predecessors.addOne(curBlockNode)
-        blocks.addOne(b2)
+        blocks.add(b2)
         val b2Last = createBlocks(e.bElse, b2)
 
         val after = BlockNode(curBlockNode.block)
-        if (b1Last.elements.isEmpty) {
+        blocks.add(after)
+        if b1Last.elements.isEmpty then
           for (b <- b1Last.predecessors){
             b.successors.remove(b1Last)
             b.successors.addOne(after)
             after.predecessors.addOne(b)
+            blocks.remove(b1Last)
           }
-        }
-        if (b2Last.elements.isEmpty) {
+          b1Last.predecessors.clear()
+        else
+          b1Last.successors.addOne(after)
+          after.predecessors.addOne(b1Last)
+        if b2Last.elements.isEmpty then
           for (b <- b2Last.predecessors) {
             b.successors.remove(b1Last)
             b.successors.addOne(after)
             after.predecessors.addOne(b)
+            blocks.remove(b2Last)
           }
-        }
-        after.prevIf = e
+          b2Last.predecessors.clear()
+        else
+          b2Last.successors.addOne(after)
+          after.predecessors.addOne(b2Last)
+
+        after.prevIf = Some(e)
         after
 
       case e: Return =>
@@ -99,7 +109,7 @@ class ControlFlowGraph(program: Block) {
   val topLevelBlock: BlockNode = BlockNode(program)
 
   // all blocks
-  val blocks: mutable.ArrayDeque[BlockNode] = mutable.ArrayDeque.empty[BlockNode]
+  val blocks: LinkedSet[BlockNode] = LinkedSet[BlockNode]()
 
   // map of each function and its root block
   val funBlockMap: mutable.Map[Fn, FnBlockNode] = mutable.HashMap.empty[Fn, FnBlockNode]
@@ -107,7 +117,7 @@ class ControlFlowGraph(program: Block) {
   // map of each block statement and the linkedset of its content
   val blockContentMap: mutable.Map[Block, LinkedSet[Stmt]] = mutable.HashMap.empty[Block, LinkedSet[Stmt]]
 
-  blocks.addOne(topLevelBlock)
+  blocks.add(topLevelBlock)
 
   createBlocks(program, topLevelBlock)
 }
@@ -116,6 +126,6 @@ class BlockNode(val block: Block,
                 val elements: mutable.ArrayDeque[Stmt] = mutable.ArrayDeque.empty[Stmt],
                 val predecessors: mutable.Set[BlockNode] = mutable.HashSet.empty[BlockNode],
                 val successors: mutable.Set[BlockNode] = mutable.HashSet.empty[BlockNode],
-                var prevIf: If = null)
+                var prevIf: Option[If] = None)
 
 class FnBlockNode(block: Block, val fn: Fn) extends BlockNode(block)

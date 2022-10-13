@@ -21,10 +21,9 @@ class ConversionSSA(program: Block) {
       }
     }
 
-  private def computeIDomMaps(): (mutable.Map[BlockNode, BlockNode], mutable.Map[BlockNode, mutable.ArrayDeque[BlockNode]]) =
+  private def computeIDomMaps(): (mutable.Map[BlockNode, BlockNode], mutable.Map[BlockNode, LinkedSet[BlockNode]]) =
     val iDomMap: mutable.Map[BlockNode, BlockNode] = mutable.HashMap.empty[BlockNode, BlockNode]
-    val iDomReverseMap = mutable.HashMap.empty[BlockNode, mutable.ArrayDeque[BlockNode]]
-    cfg.blocks.foreach(b => iDomReverseMap.put(b, mutable.ArrayDeque.empty[BlockNode]))
+    val iDomReverseMap = mutable.HashMap.empty[BlockNode, LinkedSet[BlockNode]]
 
     // map from each block and its dominators, ordered from furthest to nearest
     val iDomMap_ = mutable.HashMap.empty[BlockNode, mutable.ArrayDeque[BlockNode]]
@@ -44,12 +43,29 @@ class ConversionSSA(program: Block) {
         traverse(child)
       }
 
+    // BFS
+    def traverseBack(cur: BlockNode): Unit =
+      val nodesAdded = mutable.HashSet.empty[BlockNode]
+      val blockNodeQueue = mutable.Queue[BlockNode]()
+      blockNodeQueue.addOne(cur)
+      nodesAdded.add(cur)
+      while (blockNodeQueue.nonEmpty) {
+        val node = blockNodeQueue.removeHead()
+        iDomMap.get(node) match
+          case None => ;
+          case Some(predecessor: BlockNode) => iDomReverseMap.getOrElseUpdate(predecessor, LinkedSet[BlockNode]()).add(node)
+
+        blockNodeQueue.addAll(node.successors.diff(nodesAdded))
+        nodesAdded.addAll(node.successors)
+      }
+
     roots.foreach(traverse)
-    iDomMap_.foreach((b, dominators) => {
-      iDomMap.put(b, dominators.last)
-      val children = iDomReverseMap.getOrElseUpdate(dominators.last, throw IllegalStateException())
-      children.addOne(b)
+    iDomMap_.foreach((b: BlockNode, dominators: mutable.ArrayDeque[BlockNode]) => {
+      if dominators.nonEmpty then
+        iDomMap.put(b, dominators.last)
     })
+
+    roots.foreach(traverseBack)
     (iDomMap, iDomReverseMap)
 
   private def computeDominatorFrontiers(): mutable.Map[BlockNode, mutable.ArrayDeque[BlockNode]] =
@@ -86,8 +102,9 @@ class ConversionSSA(program: Block) {
               val phi = Phi()
               phi.from.put(b.block, x)
               namePhiMap.put(x, phi)
-              cfg.blockContentMap.getOrElseUpdate(d.block, LinkedSet[Stmt]()).insertAfter(d.prevIf, Let(x, phi))
-
+              val newLet = Let(x, phi)
+              cfg.blockContentMap.getOrElseUpdate(d.block, LinkedSet[Stmt]()).insertAfter(d.prevIf.get, newLet)
+              d.elements.prepend(newLet)
           workList.add(d)
         }
       }
@@ -135,7 +152,7 @@ class ConversionSSA(program: Block) {
         s match
           case s: Let =>
             rewrite(s.value);
-            s.name = newName(s.name)
+            s.name = newName(s.name);
           case s: If => rewrite(s.cond)
           case s: Return => rewrite(s.value)
           case s: Exp => rewrite(s)
@@ -151,14 +168,14 @@ class ConversionSSA(program: Block) {
       }
 
       // rename each successor in the dominator tree
-      iDomReverseMap.getOrElse(blockNode, mutable.ArrayDeque.empty[BlockNode]).foreach(rename)
+      iDomReverseMap.getOrElse(blockNode, LinkedSet[BlockNode]()).foreach(rename)
 
       // pop out new name
       blockNode.elements.foreach((s: Stmt) =>
         s match
           case s: Let =>
             nameStack.get(s.name) match {
-              case None => ;
+              case None => ;//throw IllegalStateException("Internal Error: name " + s.name + " should have a counter stack!");
               case Some(stack: mutable.Stack[Integer]) => stack.pop()
             }
           case _: If => ;
@@ -183,7 +200,7 @@ class ConversionSSA(program: Block) {
   // iDomMap: map of each block node and its immediate dominator
   // iDomReverseMap: map of each block node and blocks that have this block as their immediate dominator
   val (iDomMap: mutable.Map[BlockNode, BlockNode],
-  iDomReverseMap: mutable.Map[BlockNode, mutable.ArrayDeque[BlockNode]]) = computeIDomMaps()
+  iDomReverseMap: mutable.Map[BlockNode, LinkedSet[BlockNode]]) = computeIDomMaps()
 
   // map of each block node and its dominator frontiers
   val DFMap: mutable.Map[BlockNode, mutable.ArrayDeque[BlockNode]] = computeDominatorFrontiers()

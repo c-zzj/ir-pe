@@ -1,6 +1,7 @@
 package util
 
 import ssa.Stmt
+import ssa.BlockNode
 
 /**
  * Based on:
@@ -68,7 +69,7 @@ case object PPrint {
             s"$prefix(\n${prettyFields.mkString(",\n")}\n$indent)"
         }
       // Stmt classes, based on case classes.
-      case p: Stmt =>
+      case p: (Stmt | BlockNode) =>
         val prefix = p.getClass.getSimpleName
         // We'll use reflection to get the constructor arg names and values.
         val cls = p.getClass
