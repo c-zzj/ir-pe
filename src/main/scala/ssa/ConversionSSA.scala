@@ -111,7 +111,7 @@ class ConversionSSA(program: Block) {
 
     def curName(n: String): String =
       nameStack.get(n) match {
-        case None => n = n + "_" + 0;
+        case None => n + "_" + 0;
         case Some(stack: mutable.Stack[Integer]) => n + "_" + stack.top;
       }
 
