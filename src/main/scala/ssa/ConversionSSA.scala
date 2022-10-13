@@ -4,13 +4,28 @@ import scala.collection.mutable
 import ssa.PPrint
 
 class ConversionSSA(program: Block) {
+  /**
+   * Find the global variables in the CFG and store the blocks in which they are defined.
+   * A global variable is one that is used in multiple CFG blocks
+   * A variable is global iff. it is a free variable in some CFG block.
+   */
   private def find_global_vars(): Unit =
     for (block <- cfg.blocks) {
+      // function parameters are defined in the first block of the function body
+      block match {
+        case block: FnBlockNode =>
+          if block == cfg.funBlockMap(block.fn) then block.fn.params.foreach((name: String) =>
+            val var_blocks = nameBlockMap.getOrElseUpdate(name, mutable.HashSet.empty[BlockNode]);
+            var_blocks.add(block)
+          );
+        case _ => ;
+      }
+
       val varkill = mutable.HashSet.empty[String]
       for (stmt <- block.elements){
         val addGlobal = (name: String) => if ! varkill.contains(name) then globals.add(name)
         stmt match
-          case stmt: Let =>
+          case stmt: Assign =>
             findVarsUsed(stmt.value).foreach(addGlobal)
             varkill.add(stmt.name)
             val var_blocks = nameBlockMap.getOrElseUpdate(stmt.name, mutable.HashSet.empty[BlockNode])
@@ -22,6 +37,13 @@ class ConversionSSA(program: Block) {
       }
     }
 
+  /**
+   * Compute the dominator tree of the CFG
+   * A dominator tree has the same vertices as the CFG
+   * Two nodes form an edge in the dominator tree if one is the immediate (closest) dominator of the other
+   * @return IDomMap: A map from each vertex to its immediate dominator
+   *         IDomReverseMap: The successors, ordered from closest to furthest, of each node in the dominator tree.
+   */
   private def computeIDomMaps(): (mutable.Map[BlockNode, BlockNode], mutable.Map[BlockNode, LinkedSet[BlockNode]]) =
     val iDomMap: mutable.Map[BlockNode, BlockNode] = mutable.HashMap.empty[BlockNode, BlockNode]
     val iDomReverseMap = mutable.HashMap.empty[BlockNode, LinkedSet[BlockNode]]
@@ -29,7 +51,11 @@ class ConversionSSA(program: Block) {
     // map from each block and its dominators, ordered from furthest to nearest
     val iDomMap_ = mutable.HashMap.empty[BlockNode, mutable.ArrayDeque[BlockNode]]
 
-    def traverse(cur: BlockNode): Unit =
+    // computes iDomMap_ using DFS traversal of the CFG
+    // when traversing an unvisited child, child.ancestors <- cur.ancestors + {cur}
+    // when traversing a visited child, child.ancestors <- child.ancestors intersect cur.ancestors
+    // by construction, the ancestors are ordered from furthest (root) to closest
+    def computeIDom(cur: BlockNode): Unit =
       val curAncestors = iDomMap_.getOrElseUpdate(cur, mutable.ArrayDeque.empty[BlockNode])
       val curAncestorSet = mutable.HashSet.from(curAncestors)
       for (child <- cur.successors) {
@@ -41,11 +67,14 @@ class ConversionSSA(program: Block) {
             if !curAncestorSet.contains(childAncestors(i)) then childAncestors.remove(i)
           }
 
-        traverse(child)
+        computeIDom(child)
       }
 
-    // BFS
-    def traverseBack(cur: BlockNode): Unit =
+    // computes the successors of each node in the dominator tree
+    // performs a BFS traversal that adds each vertex only once
+    // at each node, if it has a predecessor, adds this node to the successor list of its predecessor
+    // BFS ensures that the successors of each node are ordered from closest to furthest to it.
+    def computeIDomReverse(cur: BlockNode): Unit =
       val nodesAdded = mutable.HashSet.empty[BlockNode]
       val blockNodeQueue = mutable.Queue[BlockNode]()
       blockNodeQueue.addOne(cur)
@@ -60,30 +89,46 @@ class ConversionSSA(program: Block) {
         nodesAdded.addAll(node.successors)
       }
 
-    roots.foreach(traverse)
+    roots.foreach(computeIDom)
+    // the last ancestor is the immediate dominator
     iDomMap_.foreach((b: BlockNode, dominators: mutable.ArrayDeque[BlockNode]) => {
       if dominators.nonEmpty then
         iDomMap.put(b, dominators.last)
     })
 
-    roots.foreach(traverseBack)
+    roots.foreach(computeIDomReverse)
     (iDomMap, iDomReverseMap)
 
-  private def computeDominatorFrontiers(): mutable.Map[BlockNode, mutable.ArrayDeque[BlockNode]] =
+  /**
+   * Compute the dominator frontier of each node from the dominator tree
+   *
+   * - Only join points (> 1 predecessor) can be contained in any dominator frontier
+   * - A join point is in the dominator frontier of its immediate predecessors
+   * - If j in DF(k), l dominates k, and l does not dominate j, then j in DF(j)
+   *
+   * @return A map from each node to its dominator frontier
+   */
+  private def computeDominatorFrontier(): mutable.Map[BlockNode, mutable.ArrayDeque[BlockNode]] =
     val DFMap = mutable.HashMap.empty[BlockNode, mutable.ArrayDeque[BlockNode]]
-    cfg.blocks.foreach(b =>
-      if b.predecessors.size > 1 then
-        b.predecessors.foreach(p =>
-          var runner = p
-          while (runner != iDomMap.getOrElse(b, throw IllegalStateException("block "+b.toString+" should have an iDOM"))){
+    cfg.blocks.foreach(j =>
+      if j.predecessors.size > 1 then
+        j.predecessors.foreach(k =>
+          var runner = k
+          while (runner != iDomMap.getOrElse(j, throw IllegalStateException("block "+j.toString+" should have an iDOM"))){
             val runnerDF = DFMap.getOrElseUpdate(runner, mutable.ArrayDeque.empty[BlockNode])
-            runnerDF.addOne(b)
+            runnerDF.addOne(j)
             runner = iDomMap.getOrElse(runner, throw IllegalStateException("block "+runner.toString+" should have an iDOM"))
           }
         )
     )
     DFMap
 
+  /**
+   * Insert Phi functions for each global variable
+   * For each global variable x, insert a Phi function for it at the beginning of each node in the dominator frontier of each block
+   * in which x is defined.
+   * Also, if a Phi function for x is inserted in a node, a Phi function will be inserted to each node in the node's dominator frontier
+   */
   private def insertPhiFunctions(): Unit =
     globals.foreach(x =>
       val workList = mutable.HashSet.empty[BlockNode]
@@ -102,36 +147,44 @@ class ConversionSSA(program: Block) {
               val phi = Phi()
               phi.from.put(b.block, x)
               namePhiMap.put(x, phi)
-              val newLet = Let(x, phi)
-              cfg.blockContentMap.getOrElseUpdate(d.block, LinkedSet[Stmt]()).insertAfter(d.prevIf.get, newLet)
-              d.elements.prepend(newLet)
+              val assignPhi = Assign(x, phi)
+              // insert to the LinkedSet of the contents of the Block Stmt
+              cfg.blockContentMap.getOrElseUpdate(d.block, LinkedSet[Stmt]()).insertAfter(d.prevIf.get, assignPhi)
+              // insert to the CFG block
+              d.elements.prepend(assignPhi)
           workList.add(d)
         }
       }
     )
 
-    // replace the contents of each block
+    // update the contents of each Block Stmt
     for ((block, linkedSet) <- cfg.blockContentMap) {
       block.stmts = linkedSet.toList
     }
 
+  /**
+   * Rename variables in the CFG such that each variable is assigned exactly once
+   */
   private def rename(): Unit =
     val nameCounter = mutable.HashMap.empty[String, Integer]
-    val nameStack = mutable.HashMap.empty[String, mutable.Stack[Integer]]
+    val indexStack = mutable.HashMap.empty[String, mutable.Stack[Integer]]
 
+    // update the counter and index stack and return the new name for a given variable name
     def newName(n: String): String =
       val i = nameCounter.getOrElseUpdate(n, 0)
       nameCounter.put(n, i+1)
       val name = n + "_" + i
-      nameStack.getOrElseUpdate(n, mutable.Stack.empty[Integer]).push(i)
+      indexStack.getOrElseUpdate(n, mutable.Stack.empty[Integer]).push(i)
       name
 
+    // get the current name of the original name of a variable
     def curName(n: String): String =
-      nameStack.get(n) match {
+      indexStack.get(n) match {
         case None => n + "_" + 0;
         case Some(stack: mutable.Stack[Integer]) => n + "_" + stack.top;
       }
 
+    // replace the old names with new names in the expression
     def rewrite(e: Exp): Unit =
       e match
         case _: Rec => ;
@@ -147,10 +200,24 @@ class ConversionSSA(program: Block) {
         case e: ReadArr => rewrite(e.array); rewrite(e.index)
         case _: Phi => ;
 
+    /**
+     * 1. get new name for each assigned variable
+     * 2. replace old names with new names for each expression
+     * 3. fill in Phi function parameters for each successor
+     * 4. rename each successor in the dominator tree
+     * 5. pop out indexes for each assigned variable
+     * @param blockNode A root of the CFG forest
+     */
     def rename(blockNode: BlockNode): Unit =
+      // rename function parameters in the first block of the function body
+      blockNode match
+        case blockNode: FnBlockNode =>
+          if blockNode == cfg.funBlockMap(blockNode.fn) then blockNode.fn.params = blockNode.fn.params.map(newName)
+        case _ => ;
+
       blockNode.elements.foreach((s: Stmt) =>
         s match
-          case s: Let =>
+          case s: Assign =>
             rewrite(s.value);
             s.name = newName(s.name);
           case s: If => rewrite(s.cond)
@@ -173,8 +240,8 @@ class ConversionSSA(program: Block) {
       // pop out new name
       blockNode.elements.foreach((s: Stmt) =>
         s match
-          case s: Let =>
-            nameStack.get(s.name) match {
+          case s: Assign =>
+            indexStack.get(s.name) match {
               case None => ;//throw IllegalStateException("Internal Error: name " + s.name + " should have a counter stack!");
               case Some(stack: mutable.Stack[Integer]) => stack.pop()
             }
@@ -183,15 +250,13 @@ class ConversionSSA(program: Block) {
           case _: Exp => ;
       )
 
-    roots.foreach((b: BlockNode) =>
-      b match
-        case b: FnBlockNode => b.fn.params = b.fn.params.map(curName)
-        case _ => ;
-    )
     roots.foreach(rename)
 
   val cfg: ControlFlowGraph = ControlFlowGraph(program)
 
+  /**
+   * A map from each variable name to blocks in which it is defined
+   */
   val nameBlockMap: mutable.Map[String, mutable.Set[BlockNode]] = mutable.HashMap.empty[String, mutable.Set[BlockNode]]
 
   val globals: mutable.Set[String] = mutable.HashSet.empty[String]
@@ -208,7 +273,7 @@ class ConversionSSA(program: Block) {
   iDomReverseMap: mutable.Map[BlockNode, LinkedSet[BlockNode]]) = computeIDomMaps()
 
   // map of each block node and its dominator frontiers
-  val DFMap: mutable.Map[BlockNode, mutable.ArrayDeque[BlockNode]] = computeDominatorFrontiers()
+  val DFMap: mutable.Map[BlockNode, mutable.ArrayDeque[BlockNode]] = computeDominatorFrontier()
 
   // store the unique phi functions inserted to each block node
   private val blockNodePhiMap = mutable.HashMap.empty[BlockNode, mutable.HashMap[String, Phi]]
@@ -216,6 +281,12 @@ class ConversionSSA(program: Block) {
   rename()
 }
 
+/**
+ * Find the used variables in an expression.
+ * They are the union of {name: Var(name) in e} and findFreeVars(fn) for each fn: Fn in e.
+ * @param e Any expression
+ * @return The set of variables names that are used in e
+ */
 def findVarsUsed(e: Exp): mutable.Set[String] =
   val varsUsed = mutable.HashSet.empty[String]
   def findVarsUsed_(e: Exp): Unit =
@@ -235,13 +306,18 @@ def findVarsUsed(e: Exp): mutable.Set[String] =
   findVarsUsed_(e)
   varsUsed
 
+/**
+ * Find the free variables in a Fn expression
+ * @param e any Fn expression
+ * @return set of free variables in e
+ */
 def findFreeVars(e: Fn): mutable.Set[String] =
   val freeVars = mutable.HashSet.empty[String]
   val declaredVars = mutable.HashSet.empty[String]
   declaredVars.addAll(e.params.iterator)
   def findFreeVars_(e: Stmt): Unit =
     e match
-      case e: Let => findFreeVars_(e.value); declaredVars.add(e.name);
+      case e: Assign => findFreeVars_(e.value); declaredVars.add(e.name);
       case e: Block => e.stmts.foreach(findFreeVars_);
       case e: If => findFreeVars_(e.cond); findFreeVars_(e.bThen); findFreeVars_(e.bElse);
       case e: Return => findFreeVars_(e.value);

@@ -7,6 +7,11 @@ import scala.collection.mutable
 
 class ControlFlowGraph(program: Block) {
 
+  /**
+   * Extracts any Fn in an expression and apply f to them
+   * @param e any expression
+   * @param f Fn handler
+   */
   private def applyToFn(e: Exp, f: Fn => Unit): Unit =
     e match
       case e: Rec => applyToFn(e.fn, f)
@@ -37,7 +42,7 @@ class ControlFlowGraph(program: Block) {
     }
 
     e match
-      case e: Let =>
+      case e: Assign =>
         applyToFn(e.value, createBlockForFn)
         curBlockNode.elements.addOne(e)
         curBlockNode
@@ -52,6 +57,8 @@ class ControlFlowGraph(program: Block) {
         }
         b
       case e: If =>
+        // create 3 new BlockNodes: 2 for each branch, and 1 for the statements after this If statement
+
         applyToFn(e.cond, createBlockForFn)
 
         curBlockNode.elements.addOne(e)
@@ -89,16 +96,26 @@ class ControlFlowGraph(program: Block) {
         curBlockNode.elements.addOne(e)
         curBlockNode
 
-  // the root block
+  /**
+   * The first block of the program
+   */
   val topLevelBlock: BlockNode = BlockNode(program)
 
-  // all blocks
+  /**
+   * All CFG blocks of the program
+   * Since there are no while loops, the blocks form a rooted directed forest 
+   * (each component of the forest is a rooted directed tree)
+   */
   val blocks: LinkedSet[BlockNode] = LinkedSet[BlockNode]()
 
-  // map of each function and its root block
+  /**
+   * A map from each function to the first BlockNode of the function body
+   */
   val funBlockMap: mutable.Map[Fn, FnBlockNode] = mutable.HashMap.empty[Fn, FnBlockNode]
 
-  // map of each block statement and the linkedset of its content
+  /**
+   * A map from each Block Stmt to a LinkedSet of its elements
+   */
   val blockContentMap: mutable.Map[Block, LinkedSet[Stmt]] = mutable.HashMap.empty[Block, LinkedSet[Stmt]]
 
   blocks.add(topLevelBlock)
@@ -106,10 +123,24 @@ class ControlFlowGraph(program: Block) {
   createBlocks(program, topLevelBlock)
 }
 
+/**
+ * A CFG block
+ * @param block The closest parent Block Stmt of this CFG block
+ * @param elements The elements of this CFG block
+ * @param predecessors The predecessors of this CFG block
+ * @param successors The successors of this CFG block
+ * @param prevIf The If Stmt before this CFG block, if exists. The If Stmt should exist for any
+ *               CFG block that has more than 1 predecessor (i.e. the join point of >1 blocks).
+ */
 class BlockNode(val block: Block,
                 val elements: mutable.ArrayDeque[Stmt] = mutable.ArrayDeque.empty[Stmt],
                 val predecessors: mutable.Set[BlockNode] = mutable.HashSet.empty[BlockNode],
                 val successors: mutable.Set[BlockNode] = mutable.HashSet.empty[BlockNode],
                 var prevIf: Option[If] = None)
 
+/**
+ * A CFG block of a function body
+ * @param block The closest parent Block Stmt of this CFG block
+ * @param fn The Fn of which this CFG block is in the body
+ */
 class FnBlockNode(block: Block, val fn: Fn) extends BlockNode(block)

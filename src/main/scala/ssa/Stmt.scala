@@ -6,7 +6,7 @@ import scala.collection.mutable
 
 trait Stmt
 
-class Let(var name: String, var value: Exp) extends Stmt
+class Assign(var name: String, var value: Exp) extends Stmt
 
 class Block(var stmts: List[Stmt]) extends Stmt:
   def this(stmts: Stmt*) =

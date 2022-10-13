@@ -13,41 +13,41 @@ class TestConversionSSA extends AnyFlatSpec{
 
   "A SSA Conversion" should "not throw any exception" in {
     val b1 = Block(
-      Let("x", IntLiteral(1)),
+      Assign("x", IntLiteral(1)),
       If(
         IntLiteral(1),
-        Block(Let("x", IntLiteral(2))),
-        Block(Let("x", IntLiteral(3)))
+        Block(Assign("x", IntLiteral(2))),
+        Block(Assign("x", IntLiteral(3)))
       ),
-      Let("x", Var("x"))
+      Assign("x", Var("x"))
     )
     test(b1)
 
     val b2 = Block(
-      Let("x", IntLiteral(1)),
-      Let("f", Fn(List("p1", "p2"), Block(
+      Assign("x", IntLiteral(1)),
+      Assign("f", Fn(List("p"), Block(
         If(
-          Var("x"),
-          Block(Let("res", Var("p1"))),
-          Block(Let("res", Var("p2")))
+          IntLiteral(1),
+          Block(Assign("p", Var("x"))),
+          Block(Assign("p", Var("p")))
         ),
-        Return(Var("res"))
+        Return(Var("p"))
       ))),
-      Apply(Var("f"), List(IntLiteral(3),IntLiteral(4)))
+      Apply(Var("f"), List(IntLiteral(3)))
     )
     test(b2)
 
     val b3 = Block(
       If(
         IntLiteral(1),
-        Block(Let("x", StrLiteral("c"))),
+        Block(Assign("x", StrLiteral("c"))),
         Block(If(
           IntLiteral(2),
-          Block(Let("x", StrLiteral("a"))),
-          Block(Let("x", StrLiteral("b")))
+          Block(Assign("x", StrLiteral("a"))),
+          Block(Assign("x", StrLiteral("b")))
         ))
       ),
-      Let("y",Var("x"))
+      Assign("y",Var("x"))
     )
     test(b3)
   }
