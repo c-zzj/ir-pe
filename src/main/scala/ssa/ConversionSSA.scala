@@ -19,7 +19,6 @@ class ConversionSSA(program: Block) {
           case stmt: Exp => findVarsUsed(stmt).foreach(addGlobal);
           case _: Block => throw IllegalStateException("Block stmt should not be in the CFG");
       }
-
     }
 
   private def computeIDomMaps(): (mutable.Map[BlockNode, BlockNode], mutable.Map[BlockNode, mutable.ArrayDeque[BlockNode]]) =
@@ -82,9 +81,10 @@ class ConversionSSA(program: Block) {
           // find the content corresponding to d's block, and then insert phi node
           val namePhiMap = blockNodePhiMap.getOrElseUpdate(d, mutable.HashMap.empty[String, Phi])
           namePhiMap.get(x) match
-            case Some(_: Phi) => ; // the var name will be filled in the renaming phase
+            case Some(phi: Phi) => phi.from.put(b.block, x)
             case None =>
               val phi = Phi()
+              phi.from.put(b.block, x)
               namePhiMap.put(x, phi)
               cfg.blockContentMap.getOrElseUpdate(d.block, LinkedSet[Stmt]()).insertAfter(d.prevIf, Let(x, phi))
 
@@ -100,14 +100,20 @@ class ConversionSSA(program: Block) {
 
   private def rename(): Unit =
     val nameCounter = mutable.HashMap.empty[String, Integer]
-    val nameStack = mutable.HashMap.empty[String, mutable.Stack[Option[Integer]]]
+    val nameStack = mutable.HashMap.empty[String, mutable.Stack[Integer]]
 
     def newName(n: String): String =
       val i = nameCounter.getOrElseUpdate(n, 1)
       nameCounter.put(n, i+1)
       val name = n + "_" + i
-      nameStack.getOrElseUpdate(n, mutable.Stack.empty[Option[Integer]]).push(Some(i))
+      nameStack.getOrElseUpdate(n, mutable.Stack.empty[Integer]).push(i)
       name
+
+    def curName(n: String): String =
+      nameStack.get(n) match {
+        case None => n = n + "_" + 0;
+        case Some(stack: mutable.Stack[Integer]) => n + "_" + stack.top;
+      }
 
     def rewrite(e: Exp): Unit =
       e match
@@ -116,17 +122,13 @@ class ConversionSSA(program: Block) {
         case e: BinOp => rewrite(e.lhs); rewrite(e.rhs)
         case _: StrLiteral => ;
         case _: IntLiteral => ;
-        case e: Var =>
-          nameStack.get(e.name) match {
-            case None => ;
-            case Some(stack: mutable.Stack[Option[Integer]]) => ;
-          }
+        case e: Var => e.name = curName(e.name)
         case UnitE => ;
         case e: Apply => rewrite(e.fn); e.args.foreach(e_ => rewrite(e_))
         case e: Build => rewrite(e.fn); rewrite(e.size);
         case e: Arr => e.elements.foreach(e_ => rewrite(e_))
-        case e: ReadArr => rewrite(e.array); rewrite(e.index);
-      ;
+        case e: ReadArr => rewrite(e.array); rewrite(e.index)
+        case _: Phi => ;
 
     def rename(blockNode: BlockNode): Unit =
       blockNode.elements.foreach((s: Stmt) =>
@@ -137,6 +139,31 @@ class ConversionSSA(program: Block) {
           case s: If => rewrite(s.cond)
           case s: Return => rewrite(s.value)
           case s: Exp => rewrite(s)
+      )
+
+      // fill in phi-function parameters
+      for (successor <- blockNode.successors){
+        val phiFunctions = blockNodePhiMap.getOrElse(successor, mutable.HashMap.empty[String, Phi])
+        for ((name, phi) <- phiFunctions){
+          if phi.from.contains(blockNode.block) then
+            phi.from.put(blockNode.block, curName(name))
+        }
+      }
+
+      // rename each successor in the dominator tree
+      iDomReverseMap.getOrElse(blockNode, mutable.ArrayDeque.empty[BlockNode]).foreach(rename)
+
+      // pop out new name
+      blockNode.elements.foreach((s: Stmt) =>
+        s match
+          case s: Let =>
+            nameStack.get(s.name) match {
+              case None => ;
+              case Some(stack: mutable.Stack[Integer]) => stack.pop()
+            }
+          case _: If => ;
+          case _: Return => ;
+          case _: Exp => ;
       )
 
     roots.foreach(rename)
