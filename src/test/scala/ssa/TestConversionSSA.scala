@@ -50,6 +50,18 @@ class TestConversionSSA extends AnyFlatSpec{
       Assign("y",Var("x"))
     )
     test(b3)
+
+    val b4 = Block(
+      Assign("x", IntLiteral(1)),
+      Assign("f", Rec("f", Fn(List(), Block(
+        Assign("y", Var("x")),
+        Assign("x", Var("x")),
+        Apply(Var("f"), List())
+      )))),
+      Assign("x", IntLiteral(2))
+    )
+
+    test(b4)
   }
 
 }

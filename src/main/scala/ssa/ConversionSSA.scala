@@ -187,7 +187,7 @@ class ConversionSSA(program: Block) {
     // replace the old names with new names in the expression
     def rewrite(e: Exp): Unit =
       e match
-        case _: Rec => ;
+        case e: Rec => e.name = curName(e.name);
         case _: Fn => ;
         case e: BinOp => rewrite(e.lhs); rewrite(e.rhs)
         case _: StrLiteral => ;
