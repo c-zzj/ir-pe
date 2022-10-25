@@ -1,11 +1,10 @@
-package ssa
+package conversion
 
-import ssa.{BlockNode, Stmt}
+import conversion.{BlockNode, Stmt}
 import scala.collection.mutable
 
 /**
- * Based on:
- * https://gist.github.com/carymrobbins/7b8ed52cd6ea186dbdf8
+ * Adapted from https://gist.github.com/carymrobbins/7b8ed52cd6ea186dbdf8
  */
 case object PPrint {
 
@@ -79,6 +78,28 @@ case object PPrint {
           field.setAccessible(true);
           field.get(p)
         )
+        // If we weren't able to match up fields/values, fall back to toString.
+        if (fields.length != values.length) return p.toString
+        fields.zip(values).toList match {
+          // If there are no fields, just use the normal String representation.
+          case Nil => p.toString
+          // If there is just one field, let's just print it as a wrapper.
+          case (_, value) :: Nil => s"$prefix(${thisDepth(value)})"
+          // If there is more than one field, build up the field names and values.
+          case kvps =>
+            val prettyFields = kvps.map { case (k, v) => s"$fieldIndent$k = ${nextDepth(v)}" }
+            // If the result is not too long, pretty print on one line.
+            val resultOneLine = s"$prefix(${prettyFields.mkString(", ")})"
+            if (resultOneLine.length <= maxElementWidth) return resultOneLine
+            // Otherwise, build it with newlines and proper field indents.
+            s"$prefix(\n${prettyFields.mkString(",\n")}\n$indent)"
+        }
+      case p: LinkedSet[Stmt] =>
+        val prefix = p.getClass.getSimpleName
+        // We'll use reflection to get the constructor arg names and values.
+        val cls = p.getClass
+        val fields = List("stmts")
+        val values = List(p.toList)
         // If we weren't able to match up fields/values, fall back to toString.
         if (fields.length != values.length) return p.toString
         fields.zip(values).toList match {

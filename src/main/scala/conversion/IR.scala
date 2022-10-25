@@ -1,18 +1,23 @@
-package ssa
-
-import ast.*
+package conversion
 
 import scala.collection.mutable
 
-trait Stmt
+class IR(var prog: Block, var varCounter: Int)
+
+class Stmt:
+  def toExp: Exp =
+    this match
+      case e: Exp => e
+      case _ => throw RuntimeException("Stmt " + this + " is not an Exp")
+class InitClosure(var env: List[String], var fn: String) extends Exp
 
 class Assign(var name: String, var value: Exp) extends Stmt
 
-class Block(var stmts: List[Stmt]) extends Stmt:
+class Block(var stmts: LinkedSet[Stmt]) extends Stmt:
   def this(stmts: Stmt*) =
-    this(stmts.toList)
+    this(LinkedSet[Stmt](stmts.toList))
 
-class If(var cond: Exp, val bThen: Block, val bElse: Block) extends Stmt
+class If(var cond: Exp, var bThen: Block, var bElse: Block) extends Stmt
 
 class Return(var value: Exp) extends Stmt
 
@@ -34,7 +39,8 @@ class Fn(var params: List[String],
          val body: Block,
          val isRestricted: Boolean = false,
          val isSimplified: Boolean = false,
-         val hasSideEffect: Boolean = false) extends Exp
+         val hasSideEffect: Boolean = false,
+         var env: List[String] = List.empty[String]) extends Exp
 
 class Rec(var name: String, var fn: Fn) extends Exp
 

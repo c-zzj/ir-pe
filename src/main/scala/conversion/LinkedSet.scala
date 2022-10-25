@@ -1,4 +1,4 @@
-package ssa
+package conversion
 import parser.Token.Type.False
 
 import scala.collection.mutable
@@ -37,12 +37,27 @@ class LinkedSet[A] extends mutable.Iterable[A]{
     this()
     coll.iterator.foreach(add)
 
-  def insertBefore(cur: Node, toInsert: Node): Unit =
+  private def insertBefore(cur: Node, toInsert: Node): Unit =
     val prev = cur.prev
     prev.next = toInsert
     toInsert.prev = prev
     toInsert.next = cur
     cur.prev = toInsert
+
+  /**
+   * Prepend the element, if it is not present.
+   * Time complexity: O(1)
+   *
+   * @param element The element to append at the end
+   * @return true if element exists in the hashset, false otherwise
+   */
+  def prepend(element: A): Boolean =
+    if nodeMap.contains(element) then return false
+    size_ += 1
+    val newHead = Node(Some(element))
+    nodeMap.put(element, newHead)
+    insertBefore(head_.next, newHead)
+    true
 
   /**
    * Append the element, if it is not present.
@@ -105,7 +120,7 @@ class LinkedSet[A] extends mutable.Iterable[A]{
         true
 
 
-  def removeNode(node: Node): Unit =
+  private def removeNode(node: Node): Unit =
     val prev = node.prev
     val next = node.next
     prev.next = next
@@ -130,7 +145,7 @@ class LinkedSet[A] extends mutable.Iterable[A]{
         size_ -= 1
         true
 
-  def removeHead(): A =
+  private def removeHead(): A =
     if size_ == 0 then throw java.util.NoSuchElementException()
     head_.next.value match
       case None => throw IllegalStateException("Internal error: null value inside element node!")
@@ -153,6 +168,11 @@ class LinkedSet[A] extends mutable.Iterable[A]{
       cur = cur.next
     }
     list.toList
+
+  override def map[B](f: A => B): LinkedSet[B] =
+    val newSet = LinkedSet[B]
+    this.foreach(e => newSet.add(f(e)))
+    newSet
 
   override def toString: String =
     var s = "LinkedSet("

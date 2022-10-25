@@ -1,6 +1,6 @@
-package ssa
+package conversion
 import org.scalatest.flatspec.AnyFlatSpec
-import ssa.LinkedSet
+import conversion.LinkedSet
 
 class TestLinkedSet extends AnyFlatSpec {
   "A linked set" should "add elements correctly" in {

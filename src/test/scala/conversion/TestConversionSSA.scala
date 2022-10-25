@@ -1,6 +1,6 @@
-package ssa
+package conversion
 import org.scalatest.flatspec.AnyFlatSpec
-import ssa.{Stmt, ConversionSSA, PPrint}
+import conversion.{Stmt, ConversionSSA, PPrint}
 
 
 class TestConversionSSA extends AnyFlatSpec{
@@ -11,7 +11,7 @@ class TestConversionSSA extends AnyFlatSpec{
     println("-------AFTER CONVERSION--------")
     println(PPrint.prettyPrint(b))
 
-  "A SSA Conversion" should "not throw any exception" in {
+  "An SSA Conversion" should "not throw any exception" in {
     val b1 = Block(
       Assign("x", IntLiteral(1)),
       If(

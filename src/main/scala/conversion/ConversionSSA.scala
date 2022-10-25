@@ -1,7 +1,6 @@
-package ssa
+package conversion
 
 import scala.collection.mutable
-import ssa.PPrint
 
 class ConversionSSA(program: Block) {
   /**
@@ -14,10 +13,13 @@ class ConversionSSA(program: Block) {
       // function parameters are defined in the first block of the function body
       block match {
         case block: FnBlockNode =>
-          if block == cfg.funBlockMap(block.fn) then block.fn.params.foreach((name: String) =>
-            val var_blocks = nameBlockMap.getOrElseUpdate(name, mutable.HashSet.empty[BlockNode]);
-            var_blocks.add(block)
-          );
+          if block == cfg.funBlockMap(block.fn) then
+            val addBlock = (name: String) => {
+              val var_blocks = nameBlockMap.getOrElseUpdate(name, mutable.HashSet.empty[BlockNode]);
+              var_blocks.add(block)
+            }
+            block.fn.params.foreach(addBlock)
+            block.fn.env.foreach(addBlock)
         case _ => ;
       }
 
@@ -26,13 +28,13 @@ class ConversionSSA(program: Block) {
         val addGlobal = (name: String) => if ! varkill.contains(name) then globals.add(name)
         stmt match
           case stmt: Assign =>
-            findVarsUsed(stmt.value).foreach(addGlobal)
+            Util.findVarsUsed(stmt.value).foreach(addGlobal)
             varkill.add(stmt.name)
             val var_blocks = nameBlockMap.getOrElseUpdate(stmt.name, mutable.HashSet.empty[BlockNode])
             var_blocks.add(block)
-          case stmt: If => findVarsUsed(stmt.cond).foreach(addGlobal);
-          case stmt: Return => findVarsUsed(stmt.value).foreach(addGlobal);
-          case stmt: Exp => findVarsUsed(stmt).foreach(addGlobal);
+          case stmt: If => Util.findVarsUsed(stmt.cond).foreach(addGlobal);
+          case stmt: Return => Util.findVarsUsed(stmt.value).foreach(addGlobal);
+          case stmt: Exp => Util.findVarsUsed(stmt).foreach(addGlobal);
           case _: Block => throw IllegalStateException("Block stmt should not be in the CFG");
       }
     }
@@ -149,18 +151,13 @@ class ConversionSSA(program: Block) {
               namePhiMap.put(x, phi)
               val assignPhi = Assign(x, phi)
               // insert to the LinkedSet of the contents of the Block Stmt
-              cfg.blockContentMap.getOrElseUpdate(d.block, LinkedSet[Stmt]()).insertAfter(d.prevIf.get, assignPhi)
+              d.block.stmts.insertAfter(d.prevIf.get, assignPhi)
               // insert to the CFG block
               d.elements.prepend(assignPhi)
           workList.add(d)
         }
       }
     )
-
-    // update the contents of each Block Stmt
-    for ((block, linkedSet) <- cfg.blockContentMap) {
-      block.stmts = linkedSet.toList
-    }
 
   /**
    * Rename variables in the CFG such that each variable is assigned exactly once
@@ -212,7 +209,9 @@ class ConversionSSA(program: Block) {
       // rename function parameters in the first block of the function body
       blockNode match
         case blockNode: FnBlockNode =>
-          if blockNode == cfg.funBlockMap(blockNode.fn) then blockNode.fn.params = blockNode.fn.params.map(newName)
+          if blockNode == cfg.funBlockMap(blockNode.fn) then
+            blockNode.fn.params = blockNode.fn.params.map(newName)
+            blockNode.fn.env = blockNode.fn.env.map(newName)
         case _ => ;
 
       blockNode.elements.foreach((s: Stmt) =>
@@ -281,57 +280,3 @@ class ConversionSSA(program: Block) {
   rename()
 }
 
-/**
- * Find the used variables in an expression.
- * They are the union of {name: Var(name) in e} and findFreeVars(fn) for each fn: Fn in e.
- * @param e Any expression
- * @return The set of variables names that are used in e
- */
-def findVarsUsed(e: Exp): mutable.Set[String] =
-  val varsUsed = mutable.HashSet.empty[String]
-  def findVarsUsed_(e: Exp): Unit =
-    e match
-      case e: BinOp => findVarsUsed_(e.lhs); findVarsUsed_(e.rhs);
-      case _: IntLiteral => ;
-      case _: StrLiteral => ;
-      case e: Var => varsUsed.add(e.name);
-      case e: Fn => varsUsed.addAll(findFreeVars(e));
-      case e: Rec => findVarsUsed_(e.fn);
-      case e: Apply => findVarsUsed_(e.fn); e.args.foreach(findVarsUsed_);
-      case e: Build => findVarsUsed_(e.fn); findVarsUsed_(e.size);
-      case e: Arr => e.elements.foreach(findVarsUsed_);
-      case e: ReadArr => findVarsUsed_(e.array); findVarsUsed_(e.index);
-      case UnitE => ;
-
-  findVarsUsed_(e)
-  varsUsed
-
-/**
- * Find the free variables in a Fn expression
- * @param e any Fn expression
- * @return set of free variables in e
- */
-def findFreeVars(e: Fn): mutable.Set[String] =
-  val freeVars = mutable.HashSet.empty[String]
-  val declaredVars = mutable.HashSet.empty[String]
-  declaredVars.addAll(e.params.iterator)
-  def findFreeVars_(e: Stmt): Unit =
-    e match
-      case e: Assign => findFreeVars_(e.value); declaredVars.add(e.name);
-      case e: Block => e.stmts.foreach(findFreeVars_);
-      case e: If => findFreeVars_(e.cond); findFreeVars_(e.bThen); findFreeVars_(e.bElse);
-      case e: Return => findFreeVars_(e.value);
-      case e: BinOp => findFreeVars_(e.lhs); findFreeVars_(e.rhs);
-      case _: StrLiteral => ;
-      case _: IntLiteral => ;
-      case e: Var => if !declaredVars.contains(e.name) then freeVars.add(e.name);
-      case _: Fn => throw IllegalStateException();
-      case _: Rec => throw IllegalStateException();
-      case e: Apply => findFreeVars_(e.fn); e.args.foreach(findFreeVars_);
-      case e: Build => findFreeVars_(e.fn); findFreeVars_(e.size);
-      case e: Arr => e.elements.foreach(findFreeVars_);
-      case e: ReadArr => findFreeVars_(e.array); findFreeVars_(e.index);
-      case UnitE => ;
-
-  findFreeVars_(e.body)
-  freeVars

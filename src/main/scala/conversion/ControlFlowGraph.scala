@@ -1,7 +1,4 @@
-package ssa
-
-import ssa.*
-import ssa.LinkedSet
+package conversion
 
 import scala.collection.mutable
 
@@ -47,7 +44,6 @@ class ControlFlowGraph(program: Block) {
         curBlockNode.elements.addOne(e)
         curBlockNode
       case e: Block =>
-        blockContentMap.put(e, LinkedSet[Stmt](e.stmts))
         var b = curBlockNode
         for (stmt <- e.stmts) {
           b = createBlocks(stmt, b)
@@ -112,11 +108,6 @@ class ControlFlowGraph(program: Block) {
    * A map from each function to the first BlockNode of the function body
    */
   val funBlockMap: mutable.Map[Fn, FnBlockNode] = mutable.HashMap.empty[Fn, FnBlockNode]
-
-  /**
-   * A map from each Block Stmt to a LinkedSet of its elements
-   */
-  val blockContentMap: mutable.Map[Block, LinkedSet[Stmt]] = mutable.HashMap.empty[Block, LinkedSet[Stmt]]
 
   blocks.add(topLevelBlock)
 
