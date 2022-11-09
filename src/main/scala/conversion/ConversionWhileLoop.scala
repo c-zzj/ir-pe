@@ -1,5 +1,0 @@
-package conversion
-
-class ConversionWhileLoop {
-
-}

@@ -168,6 +168,7 @@ class ConversionSSA(program: Block) {
 
     // update the counter and index stack and return the new name for a given variable name
     def newName(n: String): String =
+      if globalVariables.contains(n) then return n + "_" + 0
       val i = nameCounter.getOrElseUpdate(n, 0)
       nameCounter.put(n, i+1)
       val name = n + "_" + i
@@ -187,7 +188,7 @@ class ConversionSSA(program: Block) {
         case e: Rec => e.name = curName(e.name);
         case _: Fn => ;
         case e: BinOp => rewrite(e.lhs); rewrite(e.rhs)
-        case _: StrLiteral => ;
+        case _: ChrLiteral => ;
         case _: IntLiteral => ;
         case e: Var => e.name = curName(e.name)
         case UnitE => ;
@@ -277,6 +278,9 @@ class ConversionSSA(program: Block) {
   // store the unique phi functions inserted to each block node
   private val blockNodePhiMap = mutable.HashMap.empty[BlockNode, mutable.HashMap[String, Phi]]
   insertPhiFunctions()
+
+  // the actual "global" variables of the program: variables declared outside any function
+  val globalVariables: mutable.Set[String] = Util.findGlobalVars(program)
   rename()
 }
 

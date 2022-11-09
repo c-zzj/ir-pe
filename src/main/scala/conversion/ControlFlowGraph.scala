@@ -14,7 +14,7 @@ class ControlFlowGraph(program: Block) {
       case e: Rec => applyToFn(e.fn, f)
       case e: Fn => f(e)
       case e: BinOp => applyToFn(e.lhs, f); applyToFn(e.rhs, f)
-      case _: StrLiteral => ;
+      case _: ChrLiteral => ;
       case _: IntLiteral => ;
       case _: Var => ;
       case UnitE => ;

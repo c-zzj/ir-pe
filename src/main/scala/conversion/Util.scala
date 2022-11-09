@@ -16,7 +16,7 @@ object Util {
         case e: InitClosure => varsUsed.add(e.fn); varsUsed.addAll(e.env)
         case e: BinOp => findVarsUsed_(e.lhs); findVarsUsed_(e.rhs);
         case _: IntLiteral => ;
-        case _: StrLiteral => ;
+        case _: ChrLiteral => ;
         case e: Var => varsUsed.add(e.name);
         case e: Fn => varsUsed.addAll(findFreeVars(e));
         case e: Rec => findVarsUsed_(e.fn);
@@ -48,7 +48,7 @@ object Util {
         case e: If => findFreeVars_(e.cond); findFreeVars_(e.bThen); findFreeVars_(e.bElse);
         case e: Return => findFreeVars_(e.value);
         case e: BinOp => findFreeVars_(e.lhs); findFreeVars_(e.rhs);
-        case _: StrLiteral => ;
+        case _: ChrLiteral => ;
         case _: IntLiteral => ;
         case e: Var => if !declaredVars.contains(e.name) then freeVars.add(e.name);
         case e: Fn => findFreeVars(e).diff(declaredVars)
@@ -61,4 +61,17 @@ object Util {
 
     findFreeVars_(e.body)
     freeVars
+
+  def findGlobalVars(s: Stmt): mutable.Set[String] =
+    val globalVars = mutable.Set.empty[String]
+    def findGlobalVars_(s: Stmt): Unit =
+      s match
+        case s: If => findGlobalVars_(s.bThen); findGlobalVars_(s.bElse)
+        case s: Block => s.stmts.foreach(findGlobalVars_)
+        case s: Assign => globalVars.add(s.name)
+        case s: Return => ;
+        case s: Exp => ;
+        
+    findGlobalVars_(s)
+    globalVars
 }
