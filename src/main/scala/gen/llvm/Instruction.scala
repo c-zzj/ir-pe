@@ -7,7 +7,7 @@ import gen.llvm.Type.TVoid
 
 trait Instruction extends LLVMItem
 
-object Instruction extends LLVMItem {
+object Instruction {
   trait Terminator extends Instruction
 
   case class Return(retType: Type, retValue: Identifier) extends Terminator :
@@ -29,7 +29,12 @@ object Instruction extends LLVMItem {
     override def toLL: String = String.join(" ", res.toLL, "=", ALLOCA.asmCode, elmType.toLL, sizeType.toLL, size.toLL)
 
   case class ExtractValue(res: Identifier, aggType: AggregateType, aggregate: Identifier, index: Identifier) extends Instruction:
-    override def toLL: String = String.join(" ", res.toLL, "=", EXTRACTVALUE.asmCode, aggregate.toLL + ',', index.toLL)
+    override def toLL: String =
+      String.join(" ", res.toLL, "=", EXTRACTVALUE.asmCode, aggregate.toLL + ',', index.toLL)
+
+  case class InsertValue(aggType: AggregateType, aggregate: Identifier, elmType: Type, elm: Identifier, index: Identifier) extends Instruction:
+    override def toLL: String =
+      String.join(" ", INSERTVALUE.asmCode, aggType.toLL, aggregate.toLL + ',', elmType.toLL, elm.toLL + ',', index.toLL)
 
   case class Load(res: Identifier, valType: Type, pointer: Identifier) extends Instruction:
     override def toLL: String = String.join(" ", res.toLL, "=", LOAD.asmCode, valType.toLL + ',', "ptr", pointer.toLL)
@@ -45,12 +50,12 @@ object Instruction extends LLVMItem {
 
   case class Phi(res: Identifier, valType: Type, valLabelPairs: List[(Identifier, Identifier)]) extends Instruction:
     override def toLL: String =
-      val valLabelString = String.join(", ", valLabelPairs.map((value, label) => "[ " + value.toLL + ", " + label.toLL + " ]"))
+      val valLabelString = Util.join(", ", valLabelPairs.map((value, label) => "[ " + value.toLL + ", " + label.toLL + " ]"))
       String.join(" ", res.toLL, "=", PHI.asmCode, valType.toLL, valLabelString)
 
   case class FunCall(res: Identifier, valType: Type, funVal: Identifier, funArgs: List[(Type, Identifier)]) extends Instruction:
     override def toLL: String =
-      val argString = String.join(", ", funArgs.map((argType, argVal) => argType.toLL + " " + argVal.toLL))
+      val argString = Util.join(", ", funArgs.map((argType, argVal) => argType.toLL + " " + argVal.toLL))
       String.join(" ", res.toLL, "=", CALL.asmCode, valType.toLL, funVal.toLL + "(" + argString + ")")
 }
 

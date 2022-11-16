@@ -37,4 +37,5 @@ object OpCode {
   val PHI: OtherOp = OtherOp("phi")
   val CALL: OtherOp = OtherOp("call")
   val EXTRACTVALUE: OtherOp = OtherOp("extractvalue")
+  val INSERTVALUE: OtherOp = OtherOp("insertvalue")
 }

@@ -24,5 +24,5 @@ object Type {
     override def toLL: String = "[" + size.toString + " x " + elmType.toLL + "]"
 
   case class TStruct(elmTypeList: List[Type]) extends AggregateType:
-    override def toLL: String = "{ " + String.join(", ", elmTypeList.map(t => t.toLL))  +" }"
+    override def toLL: String = "{ " + Util.join(", ", elmTypeList.map(t => t.toLL))  +" }"
 }

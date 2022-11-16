@@ -6,12 +6,9 @@ trait LLVMItem:
 case class Comment(message: String) extends LLVMItem:
   override def toLL: String = "; " + message
 
-case class FunParam(paramType: Type, paramName: LocalIdentifier):
-  def toLL: String = String.join(" ", paramType.toLL, paramName.toLL)
-
 case class FunDef(resultType: Type,
                   funName: GlobalIdentifier,
-                  argList: List[FunParam],
+                  argList: List[(Type, LocalIdentifier)],
                   body: List[Instruction],
                   prefix: String = "",
                   postfix: String = "") extends LLVMItem:
@@ -20,20 +17,24 @@ case class FunDef(resultType: Type,
       "define",
       prefix,
       resultType.toLL,
-      funName.toLL + "(" + String.join(", ", argList.map(p => p.toLL)) + ")",
+      funName.toLL + "(" + Util.join(", ", argList.map((t, i) => t.toLL + " " + i.toLL)) + ")",
       postfix,
       "{\n"+ body.foldLeft("")((s: String, i: Instruction) => s + '\t' + i.toLL + '\n') + "}\n"
     )
 
 
 
-case class FunDecl(resultType: Type, funName: GlobalIdentifier, argList: List[FunParam], prefix: String = "", postfix: String = "") extends LLVMItem:
+case class FunDecl(resultType: Type,
+                   funName: GlobalIdentifier,
+                   argList: List[(Type, LocalIdentifier)],
+                   prefix: String = "",
+                   postfix: String = "") extends LLVMItem:
   override def toLL: String =
     String.join(" ",
       "declare",
       prefix,
       resultType.toLL,
-      funName.toLL + "(" + String.join(", ", argList.map(p => p.toLL)) + ")",
+      funName.toLL + "(" + Util.join(", ", argList.map((t, i) => t.toLL + " " + i.toLL)) + ")",
       postfix
     )
 
