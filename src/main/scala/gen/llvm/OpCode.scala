@@ -38,4 +38,5 @@ object OpCode {
   val CALL: OtherOp = OtherOp("call")
   val EXTRACTVALUE: OtherOp = OtherOp("extractvalue")
   val INSERTVALUE: OtherOp = OtherOp("insertvalue")
+  val GETELEMENTPTR: OtherOp = OtherOp("getelementptr")
 }

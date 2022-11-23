@@ -14,14 +14,16 @@ class ControlFlowGraph(program: Block) {
       case e: Rec => applyToFn(e.fn, f)
       case e: Fn => f(e)
       case e: BinOp => applyToFn(e.lhs, f); applyToFn(e.rhs, f)
-      case _: ChrLiteral => ;
+      case _: StrLiteral => ;
       case _: IntLiteral => ;
       case _: Var => ;
-      case UnitE => ;
+      case VoidE => ;
       case e: Apply => applyToFn(e.fn, f); e.args.foreach(e_ => applyToFn(e_, f))
-      case e: Build => applyToFn(e.fn, f); applyToFn(e.size, f)
-      case e: Arr => e.elements.foreach(e_ => applyToFn(e_, f))
-      case e: ReadArr => applyToFn(e.array, f); applyToFn(e.index, f)
+      case e: InitArr => applyToFn(e.size, f)
+      case _: InitStruct => ;
+      case e: StructArrLiteral => e.elements.foreach(e_ => applyToFn(e_, f))
+      case e: GetElementAt => applyToFn(e.array, f); applyToFn(e.index, f)
+      case e: SetElementAt => applyToFn(e.array, f); applyToFn(e.index, f); applyToFn(e.elm, f)
 
 
   /**

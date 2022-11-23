@@ -20,10 +20,10 @@ object Instruction {
     override def toLL: String = String.join(" ", BR.asmCode, "label", dest.toLL)
 
   case class CondBranch(cond: Identifier, ifTrue: Identifier, ifFalse: Identifier) extends Terminator :
-    override def toLL: String = String.join(" ", BR.asmCode, "i1", cond.toLL, ",","label",ifTrue.toLL,",","label",ifFalse.toLL)
+    override def toLL: String = String.join(" ", BR.asmCode, "i1", cond.toLL + ",", "label", ifTrue.toLL + ",", "label", ifFalse.toLL)
 
   case class BinaryInstruction(res: Identifier, opCode: OpCode.BinOp, opType: Type, op1: Identifier, op2: Identifier) extends Instruction:
-    override def toLL: String = String.join(" ", res.toLL, "=", opCode.asmCode, opType.toLL, op1.toLL, op2.toLL)
+    override def toLL: String = String.join(" ", res.toLL, "=", opCode.asmCode, opType.toLL, op1.toLL + ',', op2.toLL)
 
   case class StackAlloc(res: Identifier, elmType: Type, sizeType: Type, size: Identifier) extends Instruction:
     override def toLL: String = String.join(" ", res.toLL, "=", ALLOCA.asmCode, elmType.toLL, sizeType.toLL, size.toLL)
@@ -42,6 +42,11 @@ object Instruction {
   case class Store(valType: Type, value: Identifier, pointer: Identifier) extends Instruction:
     override def toLL: String = String.join(" ", STORE.asmCode, valType.toLL, value.toLL + ',', "ptr", pointer.toLL)
 
+  case class GetElementPtr(res: Identifier, baseType: Type, pointer: Identifier, indices: List[(Type, Identifier)]) extends Instruction:
+    override def toLL: String = String.join(" ", res.toLL, GETELEMENTPTR.asmCode, baseType.toLL + ",",
+    "ptr", pointer.toLL + ",", Util.join(", ", indices.map((t, i) => t.toLL + i.toLL))
+    )
+
   case class Cast(res: Identifier, opCode: CastOp, typeFrom: Type, valueFrom: Identifier, typeTo: Type) extends Instruction:
     override def toLL: String = String.join(" ", res.toLL, "=", opCode.asmCode, typeFrom.toLL, valueFrom.toLL, "to", typeTo.toLL)
 
@@ -57,5 +62,28 @@ object Instruction {
     override def toLL: String =
       val argString = Util.join(", ", funArgs.map((argType, argVal) => argType.toLL + " " + argVal.toLL))
       String.join(" ", res.toLL, "=", CALL.asmCode, valType.toLL, funVal.toLL + "(" + argString + ")")
+
+  /**
+   * Calculate the size of a LLVM type. The result has type i32.
+   * @param res identifier of the result
+   * @param tp type to calculate
+   * @param tmpIdentifier temporary identifier with unique name
+   */
+  case class TypeOf(res: Identifier, tp: Type, tmpIdentifier: Identifier) extends Instruction:
+    /*
+     * example:
+    %Size = getelementptr %T* null, i32 1
+    %SizeI = ptrtoint %T* %Size to i32
+     */
+    override def toLL: String =
+      s"""${tmpIdentifier.toLL} = getelementptr ${tp.toLL}, ptr null, i32 1
+         |\t${res.toLL} = ptrtoint ptr ${tmpIdentifier.toLL} to i32
+         |""".stripMargin
+
+  case class OffsetOf(res: Identifier, tp: Type, index: Int, tmpIdentifier: Identifier) extends Instruction:
+    override def toLL: String =
+      s"""${tmpIdentifier.toLL} = getelementptr ${tp.toLL}, ptr null, i32 0, i32 $index
+         |\t${res.toLL} = ptrtoint ptr ${tmpIdentifier.toLL} to i32
+         |""".stripMargin
 }
 

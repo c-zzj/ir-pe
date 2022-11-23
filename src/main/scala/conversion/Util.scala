@@ -16,15 +16,17 @@ object Util {
         case e: InitClosure => varsUsed.add(e.fn); varsUsed.addAll(e.env)
         case e: BinOp => findVarsUsed_(e.lhs); findVarsUsed_(e.rhs);
         case _: IntLiteral => ;
-        case _: ChrLiteral => ;
+        case _: StrLiteral => ;
         case e: Var => varsUsed.add(e.name);
         case e: Fn => varsUsed.addAll(findFreeVars(e));
         case e: Rec => findVarsUsed_(e.fn);
         case e: Apply => findVarsUsed_(e.fn); e.args.foreach(findVarsUsed_);
-        case e: Build => findVarsUsed_(e.fn); findVarsUsed_(e.size);
-        case e: Arr => e.elements.foreach(findVarsUsed_);
-        case e: ReadArr => findVarsUsed_(e.array); findVarsUsed_(e.index);
-        case UnitE => ;
+        case e: InitArr => findVarsUsed_(e.size);
+        case _: InitStruct => ;
+        case e: StructArrLiteral => e.elements.foreach(findVarsUsed_);
+        case e: GetElementAt => findVarsUsed_(e.array); findVarsUsed_(e.index);
+        case e: SetElementAt => findVarsUsed_(e.array); findVarsUsed_(e.index); findVarsUsed_(e.elm);
+        case VoidE => ;
 
     findVarsUsed_(e)
     varsUsed
@@ -48,16 +50,18 @@ object Util {
         case e: If => findFreeVars_(e.cond); findFreeVars_(e.bThen); findFreeVars_(e.bElse);
         case e: Return => findFreeVars_(e.value);
         case e: BinOp => findFreeVars_(e.lhs); findFreeVars_(e.rhs);
-        case _: ChrLiteral => ;
+        case _: StrLiteral => ;
         case _: IntLiteral => ;
         case e: Var => if !declaredVars.contains(e.name) then freeVars.add(e.name);
         case e: Fn => findFreeVars(e).diff(declaredVars)
         case e: Rec => findFreeVars_(e.fn);
         case e: Apply => findFreeVars_(e.fn); e.args.foreach(findFreeVars_);
-        case e: Build => findFreeVars_(e.fn); findFreeVars_(e.size);
-        case e: Arr => e.elements.foreach(findFreeVars_);
-        case e: ReadArr => findFreeVars_(e.array); findFreeVars_(e.index);
-        case UnitE => ;
+        case e: InitArr => findFreeVars_(e.size);
+        case _: InitStruct => ;
+        case e: StructArrLiteral => e.elements.foreach(findFreeVars_);
+        case e: GetElementAt => findFreeVars_(e.array); findFreeVars_(e.index);
+        case e: SetElementAt => findFreeVars_(e.array); findFreeVars_(e.index); findFreeVars_(e.elm);
+        case VoidE => ;
 
     findFreeVars_(e.body)
     freeVars

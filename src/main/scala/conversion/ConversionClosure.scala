@@ -28,16 +28,18 @@ class ConversionClosure(ir: IR) {
           case e: If => rename_(e.cond); rename_(e.bThen); rename_(e.bElse);
           case e: Return => rename_(e.value);
           case e: BinOp => rename_(e.lhs); rename_(e.rhs);
-          case _: ChrLiteral => ;
+          case _: StrLiteral => ;
           case _: IntLiteral => ;
           case e: Var => if nameMap.contains(e.name) then e.name = nameMap(e.name);
           case e: Fn => rename_(e.body);
           case e: Rec => rename_(e.fn);
           case e: Apply => rename_(e.fn); e.args.foreach(rename_);
-          case e: Build => rename_(e.fn); rename_(e.size);
-          case e: Arr => e.elements.foreach(rename_);
-          case e: ReadArr => rename_(e.array); rename_(e.index);
-          case UnitE => ;
+          case e: InitArr => rename_(e.size);
+          case _: InitStruct => ;
+          case e: StructArrLiteral => e.elements.foreach(rename_);
+          case e: GetElementAt => rename_(e.array); rename_(e.index);
+          case e: SetElementAt => rename_(e.array); rename_(e.index); rename_(e.elm)
+          case VoidE => ;
 
     def getClosure(e: Fn | Rec): InitClosure =
       ir.varCounter += 1;
@@ -71,27 +73,32 @@ class ConversionClosure(ir: IR) {
           e.lhs = convertClosure_(e.lhs).asInstanceOf[Exp]
           e.rhs = convertClosure_(e.rhs).asInstanceOf[Exp]
           e
-        case e: ChrLiteral => e;
+        case e: StrLiteral => e;
         case e: IntLiteral => e;
         case e: Var => e;
         case e: Apply =>
           e.fn = convertClosure_(e.fn).asInstanceOf[Exp]
           e.args = e.args.map(convertClosure_).map(e_ => e_.asInstanceOf[Exp])
           e
-        case e: Build =>
-          e.fn = convertClosure_(e.fn).asInstanceOf[Exp]
+        case e: InitArr =>
           e.size = convertClosure_(e.size).asInstanceOf[Exp]
           e
-        case e: Arr =>
+        case e: InitStruct => e
+        case e: StructArrLiteral =>
           e.elements = e.elements.map(convertClosure_).map(e_ => e_.asInstanceOf[Exp])
           e
-        case e: ReadArr =>
+        case e: GetElementAt =>
           e.array = convertClosure_(e.array).asInstanceOf[Exp]
           e.index = convertClosure_(e.index).asInstanceOf[Exp]
           e
+        case e: SetElementAt =>
+          e.array = convertClosure_(e.array).asInstanceOf[Exp]
+          e.index = convertClosure_(e.index).asInstanceOf[Exp]
+          e.index = convertClosure_(e.elm).asInstanceOf[Exp]
+          e
         case e: Fn=> getClosure(e)
         case e: Rec => getClosure(e)
-        case UnitE => UnitE;
+        case VoidE => VoidE;
 
 
     function match
@@ -106,16 +113,18 @@ class ConversionClosure(ir: IR) {
       case e: If => convertGlobal(e.cond); convertGlobal(e.bThen); convertGlobal(e.bElse);
       case e: Return => convertGlobal(e.value);
       case e: BinOp => convertGlobal(e.lhs); convertGlobal(e.rhs);
-      case _: ChrLiteral => ;
+      case _: StrLiteral => ;
       case _: IntLiteral => ;
       case _: Var => ;
       case e: Fn => convertClosure(e);
       case e: Rec => convertClosure(e.fn);
       case e: Apply => convertGlobal(e.fn); e.args.foreach(convertGlobal);
-      case e: Build => convertGlobal(e.fn); convertGlobal(e.size);
-      case e: Arr => e.elements.foreach(convertGlobal);
-      case e: ReadArr => convertGlobal(e.array); convertGlobal(e.index);
-      case UnitE => ;
+      case e: InitArr => convertGlobal(e.size);
+      case _: InitStruct => ;
+      case e: StructArrLiteral => e.elements.foreach(convertGlobal);
+      case e: GetElementAt => convertGlobal(e.array); convertGlobal(e.index);
+      case e: SetElementAt => convertGlobal(e.array); convertGlobal(e.index); convertGlobal(e.elm);
+      case VoidE => ;
 
 
   val globalVars: mutable.Set[String] = Util.findGlobalVars(ir.prog)

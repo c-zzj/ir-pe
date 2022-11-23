@@ -12,7 +12,7 @@ class PartialEvaluator2 {
   def isConst(e: Exp): Boolean =
     e match
       case e: BinOp => false
-      case e: ChrLiteral => true
+      case e: StrLiteral => true
       case e: IntLiteral => true
       case e: Var => false
       case e: Fn => true
@@ -43,18 +43,18 @@ class PartialEvaluator2 {
             }
           case (lhs, rhs) => BinOp(lhs,e.op, rhs)
         }
-      case e: (ChrLiteral | IntLiteral | Fn | Rec) => e
+      case e: (StrLiteral | IntLiteral | Fn | Rec) => e
       case e: Var => e
       case e: Apply =>
         eval(e.fn) match {
           case f: Fn => e
         }
-      case e: Build => e
-      case e: Arr => e
-      case e: ReadArr => e
+      case e: InitArr => e
+      case e: StructArrLiteral => e
+      case e: GetElementAt => e
       case e: InitClosure => e
       case e: Phi => e
-      case UnitE => UnitE
+      case VoidE => VoidE
 
 
   val varExpMap = mutable.HashMap.empty[String, Exp]

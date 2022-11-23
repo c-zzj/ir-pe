@@ -188,14 +188,16 @@ class ConversionSSA(program: Block) {
         case e: Rec => e.name = curName(e.name);
         case _: Fn => ;
         case e: BinOp => rewrite(e.lhs); rewrite(e.rhs)
-        case _: ChrLiteral => ;
+        case _: StrLiteral => ;
         case _: IntLiteral => ;
         case e: Var => e.name = curName(e.name)
-        case UnitE => ;
+        case VoidE => ;
         case e: Apply => rewrite(e.fn); e.args.foreach(e_ => rewrite(e_))
-        case e: Build => rewrite(e.fn); rewrite(e.size);
-        case e: Arr => e.elements.foreach(e_ => rewrite(e_))
-        case e: ReadArr => rewrite(e.array); rewrite(e.index)
+        case e: InitArr => rewrite(e.size);
+        case _: InitStruct => ;
+        case e: StructArrLiteral => e.elements.foreach(e_ => rewrite(e_))
+        case e: GetElementAt => rewrite(e.array); rewrite(e.index)
+        case e: SetElementAt => rewrite(e.array); rewrite(e.index); rewrite(e.elm)
         case _: Phi => ;
 
     /**

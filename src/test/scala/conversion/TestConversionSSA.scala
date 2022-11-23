@@ -40,11 +40,11 @@ class TestConversionSSA extends AnyFlatSpec{
     val b3 = Block(
       If(
         IntLiteral(1),
-        Block(Assign("x", ChrLiteral('c'))),
+        Block(Assign("x", StrLiteral("c"))),
         Block(If(
           IntLiteral(2),
-          Block(Assign("x", ChrLiteral('a'))),
-          Block(Assign("x", ChrLiteral('b')))
+          Block(Assign("x", StrLiteral("a"))),
+          Block(Assign("x", StrLiteral("b")))
         ))
       ),
       Assign("y",Var("x"))
@@ -63,7 +63,7 @@ class TestConversionSSA extends AnyFlatSpec{
 
     test(b4)
 
-    println(PPrint.prettyPrint(Block(b4.stmts.toList.appended(Return(UnitE)))))
+    println(PPrint.prettyPrint(Block(b4.stmts.toList.appended(Return(VoidE)))))
   }
 
 }

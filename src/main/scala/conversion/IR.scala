@@ -25,39 +25,84 @@ class If(var cond: Exp, var bThen: Block, var bElse: Block) extends Stmt
 
 class Return(var value: Exp) extends Stmt
 
-
-trait Exp extends Stmt
+trait Exp extends Stmt:
+  def eType: IRType
 
 enum Op:
   case ADD, SUB, MUL, DIV, MOD, GT, LT, GE, LE, NE, EQ, OR, AND
 
-class BinOp(var lhs: Exp, val op: Op, var rhs: Exp) extends Exp
+class BinOp(var lhs: Exp, val op: Op, var rhs: Exp, var tp: IRType = Undefined) extends Exp:
+  override def eType: IRType = tp
 
-class ChrLiteral(val char: Char) extends Exp
+class StrLiteral(val str: String) extends Exp:
+  override def eType: IRType = IRArray(IRInt(8), Some(str.length + 1))
 
-class IntLiteral(val int: Int) extends Exp
+class IntLiteral(val int: Int, val numBits: Int = 32) extends Exp:
+  override def eType: IRType = IRInt(numBits)
 
-class Var(var name: String) extends Exp
+class Var(var name: String, var tp: IRType = Undefined) extends Exp:
+  override def eType: IRType = tp
 
 class Fn(var params: List[String],
          val body: Block,
          val isRestricted: Boolean = false,
          val isSimplified: Boolean = false,
          val hasSideEffect: Boolean = false,
-         var env: List[String] = List.empty[String]) extends Exp
+         var env: List[String] = List.empty[String],
+         var tp: IRType = Undefined) extends Exp:
+  override def eType: IRType = tp
 
-class Rec(var name: String, var fn: Fn) extends Exp
+class Rec(var name: String, var fn: Fn, var tp: IRType = Undefined) extends Exp:
+  override def eType: IRType = tp
 
-class Apply(var fn: Exp, var args: List[Exp]) extends Exp
+class Apply(var fn: Exp, var args: List[Exp], var isClosure: Boolean = false) extends Exp:
+  override def eType: IRType = fn.eType match
+    case t: IRFunction => if ! isClosure then t.retType else Undefined
+    case t: IRClosure => if isClosure then t.retType else Undefined
+    case _ => Undefined
 
-class Build(var fn: Exp, var size: Exp) extends Exp
+class InitArr(var size: Exp, var elmType: IRType) extends Exp:
+  override def eType: IRType = IRArray(elmType)
 
-class Arr(var elements: List[Exp]) extends Exp
+class InitStruct(var elmTypes: List[IRType]) extends Exp:
+  override def eType: IRType = IRStruct(elmTypes)
 
-class ReadArr(var array: Exp, var index: Exp) extends Exp
+class StructArrLiteral(var elements: List[Exp], var isArr: Boolean = false) extends Exp:
+  override def eType: IRType =
+    if isArr then IRArray(elmType = elements.head.eType, size = Some(elements.size))
+    else IRStruct(elements.map(e => e.eType))
 
-class InitClosure(var env: List[String], var fn: String) extends Exp
+class GetElementAt(var array: Exp, var index: Exp) extends Exp:
+  override def eType: IRType = Undefined
 
-class Phi(var from: mutable.Map[Block, String] = mutable.HashMap.empty[Block, String]) extends Exp
+class SetElementAt(var array: Exp, var index: Exp, var elm: Exp) extends Exp:
+  override def eType: IRType = IRVoid
 
-case object UnitE extends Exp
+class InitClosure(var env: List[String], var fn: String, var fnType: IRType = Undefined) extends Exp:
+  override def eType: IRType = fnType match
+    case t: IRFunction => IRClosure(t.retType, t.argTypeList)
+    case t: IRClosure => IRClosure(t.retType, t.argTypeList)
+    case _ => Undefined
+
+class Phi(var from: mutable.Map[Block, String] = mutable.HashMap.empty[Block, String], var tp: IRType = Undefined) extends Exp:
+  override def eType: IRType = tp
+
+case object VoidE extends Exp:
+  override def eType: IRType = IRVoid
+
+
+trait IRType
+
+case object Undefined extends IRType
+
+case class IRInt(numBits: Int) extends IRType
+
+case object IRVoid extends IRType
+
+case class IRFunction(retType: IRType, argTypeList: List[IRType]) extends IRType
+
+case class IRClosure(retType: IRType, argTypeList: List[IRType]) extends IRType
+
+case class IRArray(elmType: IRType, size: Option[Int] = None) extends IRType
+
+case class IRStruct(elmTypeList: List[IRType]) extends IRType
