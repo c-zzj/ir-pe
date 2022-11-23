@@ -5,14 +5,16 @@ import scala.collection.mutable
 class ConversionClosure(ir: IR) {
   def convertClosure(function: Fn | Rec): Unit =
 
-    def rename(env: List[String], fn: Fn | Rec): Unit =
+    def rename(env: List[NameTypePair], fn: Fn | Rec): Unit =
       val nameMap = mutable.HashMap.empty[String, String]
-      var envRenamed = List.empty[String]
-      env.foreach(name => {
-        ir.varCounter += 1
-        val newName = ir.varCounter.toString
-        envRenamed = envRenamed.appended(newName)
-        nameMap.put(name, newName)
+      var envRenamed = List.empty[NameTypePair]
+      env.foreach(pair => {
+        pair match
+          case NameTypePair(name, tp) =>
+            ir.varCounter += 1
+            val newName = ir.varCounter.toString
+            envRenamed = envRenamed.appended(NameTypePair(newName, tp))
+            nameMap.put(name, newName)
       })
       val f = fn match
         case e: Rec => e.fn
@@ -51,7 +53,7 @@ class ConversionClosure(ir: IR) {
       val env = Util.findFreeVars(f).diff(globalVars)
       rename(env.toList, f)
       convertClosure(e)
-      InitClosure(env.toList, g)
+      InitClosure(env.toList, NameTypePair(g, e.eType))
 
     def convertClosure_(e: Stmt): Stmt =
       e match
@@ -106,6 +108,10 @@ class ConversionClosure(ir: IR) {
       case function: Rec => convertClosure_(function.fn.body)
 
 
+  /**
+   * Apply convertClosure to globally defined functions
+   * @param e a global Stmt
+   */
   def convertGlobal(e: Stmt): Unit =
     e match
       case e: Assign => convertGlobal(e.value);
@@ -127,7 +133,7 @@ class ConversionClosure(ir: IR) {
       case VoidE => ;
 
 
-  val globalVars: mutable.Set[String] = Util.findGlobalVars(ir.prog)
+  val globalVars: mutable.Set[NameTypePair] = Util.findGlobalVars(ir.prog)
 
   convertGlobal(ir.prog)
 }

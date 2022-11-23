@@ -43,14 +43,23 @@ class IntLiteral(val int: Int, val numBits: Int = 32) extends Exp:
 class Var(var name: String, var tp: IRType = Undefined) extends Exp:
   override def eType: IRType = tp
 
+case class NameTypePair(name: String, tp: IRType)
+
 class Fn(var params: List[String],
          val body: Block,
          val isRestricted: Boolean = false,
          val isSimplified: Boolean = false,
          val hasSideEffect: Boolean = false,
-         var env: List[String] = List.empty[String],
+         var env: List[NameTypePair] = List.empty[NameTypePair],
          var tp: IRType = Undefined) extends Exp:
   override def eType: IRType = tp
+
+  def paramNameTypePairs: List[NameTypePair] =
+    eType match
+      case t: IRFunction =>
+        (params zip t.argTypeList).map((name, tp) => NameTypePair(name, tp))
+      case _ => List()
+
 
 class Rec(var name: String, var fn: Fn, var tp: IRType = Undefined) extends Exp:
   override def eType: IRType = tp
@@ -78,8 +87,8 @@ class GetElementAt(var array: Exp, var index: Exp) extends Exp:
 class SetElementAt(var array: Exp, var index: Exp, var elm: Exp) extends Exp:
   override def eType: IRType = IRVoid
 
-class InitClosure(var env: List[String], var fn: String, var fnType: IRType = Undefined) extends Exp:
-  override def eType: IRType = fnType match
+class InitClosure(var env: List[NameTypePair], var fn: NameTypePair) extends Exp:
+  override def eType: IRType = fn.tp match
     case t: IRFunction => IRClosure(t.retType, t.argTypeList)
     case t: IRClosure => IRClosure(t.retType, t.argTypeList)
     case _ => Undefined

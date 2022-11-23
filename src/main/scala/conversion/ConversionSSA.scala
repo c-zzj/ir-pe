@@ -14,22 +14,22 @@ class ConversionSSA(program: Block) {
       block match {
         case block: FnBlockNode =>
           if block == cfg.funBlockMap(block.fn) then
-            val addBlock = (name: String) => {
-              val var_blocks = nameBlockMap.getOrElseUpdate(name, mutable.HashSet.empty[BlockNode]);
+            val addBlock = (pair: NameTypePair) => {
+              val var_blocks = nameBlockMap.getOrElseUpdate(pair.name, mutable.HashSet.empty[BlockNode]);
               var_blocks.add(block)
             }
-            block.fn.params.foreach(addBlock)
+            block.fn.paramNameTypePairs.foreach(addBlock)
             block.fn.env.foreach(addBlock)
         case _ => ;
       }
 
-      val varkill = mutable.HashSet.empty[String]
+      val varkill = mutable.HashSet.empty[NameTypePair]
       for (stmt <- block.elements){
-        val addGlobal = (name: String) => if ! varkill.contains(name) then globals.add(name)
+        val addGlobal = (pair: NameTypePair) => if ! varkill.contains(pair) then globals.add(pair)
         stmt match
           case stmt: Assign =>
             Util.findVarsUsed(stmt.value).foreach(addGlobal)
-            varkill.add(stmt.name)
+            varkill.add(NameTypePair(stmt.name, stmt.value.eType))
             val var_blocks = nameBlockMap.getOrElseUpdate(stmt.name, mutable.HashSet.empty[BlockNode])
             var_blocks.add(block)
           case stmt: If => Util.findVarsUsed(stmt.cond).foreach(addGlobal);
@@ -132,31 +132,34 @@ class ConversionSSA(program: Block) {
    * Also, if a Phi function for x is inserted in a node, a Phi function will be inserted to each node in the node's dominator frontier
    */
   private def insertPhiFunctions(): Unit =
-    globals.foreach(x =>
-      val workList = mutable.HashSet.empty[BlockNode]
-      this.nameBlockMap.get(x) match
-        case Some(blocks) => workList.addAll(blocks)
-        case None =>;
-      while (workList.nonEmpty) {
-        val b = workList.head
-        workList.remove(b)
-        for (d <- DFMap.getOrElse(b, mutable.ArrayDeque.empty[BlockNode])){
-          // find the content corresponding to d's block, and then insert phi node
-          val namePhiMap = blockNodePhiMap.getOrElseUpdate(d, mutable.HashMap.empty[String, Phi])
-          namePhiMap.get(x) match
-            case Some(phi: Phi) => phi.from.put(b.block, x)
-            case None =>
-              val phi = Phi()
-              phi.from.put(b.block, x)
-              namePhiMap.put(x, phi)
-              val assignPhi = Assign(x, phi)
-              // insert to the LinkedSet of the contents of the Block Stmt
-              d.block.stmts.insertAfter(d.prevIf.get, assignPhi)
-              // insert to the CFG block
-              d.elements.prepend(assignPhi)
-          workList.add(d)
-        }
-      }
+    globals.foreach(pair =>
+      pair match
+        case NameTypePair(name, tp) =>
+          val workList = mutable.HashSet.empty[BlockNode]
+          this.nameBlockMap.get(name) match
+            case Some(blocks) => workList.addAll(blocks)
+            case None => ;
+          while (workList.nonEmpty) {
+            val b = workList.head
+            workList.remove(b)
+            for (d <- DFMap.getOrElse(b, mutable.ArrayDeque.empty[BlockNode])) {
+              // find the content corresponding to d's block, and then insert phi node
+              val namePhiMap = blockNodePhiMap.getOrElseUpdate(d, mutable.HashMap.empty[String, Phi])
+              namePhiMap.get(name) match
+                case Some(phi: Phi) => phi.from.put(b.block, name)
+                case None =>
+                  val phi = Phi()
+                  phi.tp = tp
+                  phi.from.put(b.block, name)
+                  namePhiMap.put(name, phi)
+                  val assignPhi = Assign(name, phi)
+                  // insert to the LinkedSet of the contents of the Block Stmt
+                  d.block.stmts.insertAfter(d.prevIf.get, assignPhi)
+                  // insert to the CFG block
+                  d.elements.prepend(assignPhi)
+              workList.add(d)
+            }
+          }
     )
 
   /**
@@ -167,13 +170,15 @@ class ConversionSSA(program: Block) {
     val indexStack = mutable.HashMap.empty[String, mutable.Stack[Integer]]
 
     // update the counter and index stack and return the new name for a given variable name
-    def newName(n: String): String =
-      if globalVariables.contains(n) then return n + "_" + 0
-      val i = nameCounter.getOrElseUpdate(n, 0)
-      nameCounter.put(n, i+1)
-      val name = n + "_" + i
-      indexStack.getOrElseUpdate(n, mutable.Stack.empty[Integer]).push(i)
-      name
+    def newName(pair: NameTypePair): String =
+      if globalVariables.contains(pair) then return pair.name + "_" + 0
+      pair match
+        case NameTypePair(n, _) =>
+          val i = nameCounter.getOrElseUpdate(n, 0)
+          nameCounter.put(n, i + 1)
+          val name = n + "_" + i
+          indexStack.getOrElseUpdate(n, mutable.Stack.empty[Integer]).push(i)
+          name
 
     // get the current name of the original name of a variable
     def curName(n: String): String =
@@ -213,15 +218,15 @@ class ConversionSSA(program: Block) {
       blockNode match
         case blockNode: FnBlockNode =>
           if blockNode == cfg.funBlockMap(blockNode.fn) then
-            blockNode.fn.params = blockNode.fn.params.map(newName)
-            blockNode.fn.env = blockNode.fn.env.map(newName)
+            blockNode.fn.params = blockNode.fn.paramNameTypePairs.map(newName)
+            blockNode.fn.env = blockNode.fn.env.map(pair => NameTypePair(newName(pair), pair.tp))
         case _ => ;
 
       blockNode.elements.foreach((s: Stmt) =>
         s match
           case s: Assign =>
             rewrite(s.value);
-            s.name = newName(s.name);
+            s.name = newName(NameTypePair(s.name, s.value.eType));
           case s: If => rewrite(s.cond)
           case s: Return => rewrite(s.value)
           case s: Exp => rewrite(s)
@@ -261,7 +266,7 @@ class ConversionSSA(program: Block) {
    */
   val nameBlockMap: mutable.Map[String, mutable.Set[BlockNode]] = mutable.HashMap.empty[String, mutable.Set[BlockNode]]
 
-  val globals: mutable.Set[String] = mutable.HashSet.empty[String]
+  val globals: mutable.Set[NameTypePair] = mutable.HashSet.empty[NameTypePair]
 
   val roots: mutable.ArrayDeque[BlockNode] = mutable.ArrayDeque.empty[BlockNode]
   roots.addOne(cfg.topLevelBlock)
@@ -282,7 +287,7 @@ class ConversionSSA(program: Block) {
   insertPhiFunctions()
 
   // the actual "global" variables of the program: variables declared outside any function
-  val globalVariables: mutable.Set[String] = Util.findGlobalVars(program)
+  val globalVariables: mutable.Set[NameTypePair] = Util.findGlobalVars(program)
   rename()
 }
 
