@@ -28,7 +28,7 @@ define i32 @main () { ; i32()*
 
     ; Call puts function to write out the string to stdout.
     call i32 @puts(i8* @.str)
-    call i32 @puts(i8* @.int)
+    call void @goo()
 
     %Offset = getelementptr {i8,i32*}, ptr null, i32 0, i32 0
     %OffsetI = ptrtoint i32** %Offset to i8
@@ -37,6 +37,12 @@ define i32 @main () { ; i32()*
     call i32 @putchar(i8 %foores)
 
     ret i32 0
+thisisalabel:
+    ret i32 0
+}
+
+define void @goo() {
+    ret void
 }
 
 define i8 @foo () {

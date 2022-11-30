@@ -7,17 +7,6 @@ import scala.collection.mutable
 
 
 class ProgramGen(val llvmProg: LLVMProgram):
-  private def convertConstant(e: Exp): Constant =
-    e match
-      case e: IntLiteral => IntConstant(e.numBits, e.int)
-      case e: StrLiteral => StringConstant(e.str)
-      case e: StructArrLiteral =>
-        if e.isArr then
-          ArrayConstant(e.elements.map(convertConstant))
-        else
-          StructConstant(e.elements.map(convertConstant))
-      case _ => throw ShouldNotReach()
-
   def gen(program: IR): Unit =
     val globalDataSection = Section()
     llvmProg.sections.addOne(globalDataSection)
@@ -31,9 +20,11 @@ class ProgramGen(val llvmProg: LLVMProgram):
         globalVars.add(NameTypePair(s.name, s.value.eType));
         s.value match
           case e: (IntLiteral | StrLiteral | StructArrLiteral) =>
+            val id = pInfo.getGlobalId
+            pInfo.varIdMap.put(s.name, id)
             globalDataSection.globals.addOne(
               GlobalVar(
-                GlobalIdentifier(s.name), convertConstant(e)
+                id, CodegenUtil.convertConstant(e)
               )
             )
           case e: Fn =>
@@ -44,17 +35,20 @@ class ProgramGen(val llvmProg: LLVMProgram):
             val fnSection = Section();
             llvmProg.sections.addOne(fnSection);
             funGen.gen(fnSection, e.fn, s.name)
-          case _ => throw ShouldNotReach("Only constants and functions are allowed for top level assignment")
+          case _ => throw CodegenUtil.ShouldNotReach("Only constants and functions are allowed for top level assignment")
       case _ => ;
     )
 
-
-
 class ProgramInfo(val globalVars: mutable.Set[NameTypePair],
-                  var localIdCounter: Int = 0,
-                  val localVarIdMap: mutable.Map[String, Int] = mutable.HashMap.empty[String, Int])
+                  var idCounter: Int = 0,
+                  val varIdMap: mutable.Map[String, Identifier] = mutable.HashMap.empty[String, Identifier],
+                  val blockLabelMap: mutable.Map[Block, Label] = mutable.HashMap.empty[Block, Label]):
+  def getGlobalId: GlobalIdentifier =
+    idCounter += 1
+    GlobalIdentifier(idCounter.toString)
+
+  def getLocalId: LocalIdentifier =
+    idCounter += 1
+    LocalIdentifier(idCounter.toString)
 
 
-final case class ShouldNotReach(private val message: String = "",
-                                 private val cause: Throwable = None.orNull)
-  extends Exception(message, cause)

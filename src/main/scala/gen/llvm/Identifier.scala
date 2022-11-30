@@ -47,3 +47,8 @@ case class StringConstant(s: String) extends Constant:
 case class ZeroConstant(valType: LLType) extends Constant:
   override def toLL: String = "zeroinitializer"
   override def getType: LLType = valType
+
+case object VoidConstant extends Constant:
+  override def toLL: String = "void"
+
+  override def getType: LLType = TVoid
