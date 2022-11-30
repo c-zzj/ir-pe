@@ -2,7 +2,7 @@ package gen.llvm
 
 case class Label(name: String) extends LLVMItem:
   def this() =
-    this("__LABEL_" + Label.ctr.toString)
+    this("LABEL_" + Label.ctr.toString)
     Label.ctr += 1
 
   override def toLL: String = name + ":"

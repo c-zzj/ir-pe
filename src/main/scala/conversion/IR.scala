@@ -2,7 +2,12 @@ package conversion
 
 import scala.collection.mutable
 
-class IR(var prog: Block, var varCounter: Int)
+/**
+ * "main" function required. Only constants and functions are allowed in global assignments
+ * @param code
+ * @param varCounter
+ */
+class IR(var code: Block, var varCounter: Int)
 
 class Stmt
 
@@ -32,7 +37,10 @@ enum Op:
   case ADD, SUB, MUL, DIV, MOD, GT, LT, GE, LE, NE, EQ, OR, AND
 
 class BinOp(var lhs: Exp, val op: Op, var rhs: Exp, var tp: IRType = Undefined) extends Exp:
-  override def eType: IRType = tp
+  override def eType: IRType =
+    op match
+      case Op.GT | Op.LT | Op.GE | Op.LE | Op.EQ | Op.NE => IRInt(1)
+      case _ => tp
 
 class StrLiteral(val str: String) extends Exp:
   override def eType: IRType = IRArray(IRInt(8), Some(str.length + 1))

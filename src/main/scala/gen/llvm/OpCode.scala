@@ -7,16 +7,17 @@ import scala.language.implicitConversions
 trait OpCode(asmCode: String)
 
 object OpCode {
-  case class BinOp(asmCode: String) extends OpCode(asmCode)
-  val ADD: BinOp = BinOp("add")
-  val SUB: BinOp = BinOp("sub")
-  val MUL: BinOp = BinOp("mul")
-  val SDIV: BinOp = BinOp("sdiv")
-  val SHL: BinOp = BinOp("shl")
-  val LSHR: BinOp = BinOp("lshr")
-  val ASHR: BinOp = BinOp("ashr")
-  val AND: BinOp = BinOp("and")
-  val OR: BinOp = BinOp("or")
+  case class BinOpCode(asmCode: String) extends OpCode(asmCode)
+  val ADD: BinOpCode = BinOpCode("add")
+  val SUB: BinOpCode = BinOpCode("sub")
+  val MUL: BinOpCode = BinOpCode("mul")
+  val SDIV: BinOpCode = BinOpCode("sdiv")
+  val SREM: BinOpCode = BinOpCode("srem")
+  val SHL: BinOpCode = BinOpCode("shl")
+  val LSHR: BinOpCode = BinOpCode("lshr")
+  val ASHR: BinOpCode = BinOpCode("ashr")
+  val AND: BinOpCode = BinOpCode("and")
+  val OR: BinOpCode = BinOpCode("or")
 
   case class CastOp(asmCode: String) extends OpCode(asmCode)
   val TRUNC: CastOp = CastOp("trunc") // truncation e.g. i64 to i32, i32 to i1

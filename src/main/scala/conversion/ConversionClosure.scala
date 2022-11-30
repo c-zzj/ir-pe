@@ -46,7 +46,7 @@ class ConversionClosure(ir: IR) {
     def getClosure(e: Fn | Rec): InitClosure =
       ir.varCounter += 1;
       val g = ir.varCounter.toString
-      ir.prog.stmts.prepend(Assign(g, e))
+      ir.code.stmts.prepend(Assign(g, e))
       val f = e match
         case e: Rec => e.fn
         case e: Fn => e
@@ -133,7 +133,7 @@ class ConversionClosure(ir: IR) {
       case VoidE => ;
 
 
-  val globalVars: mutable.Set[NameTypePair] = Util.findGlobalVars(ir.prog)
+  val globalVars: mutable.Set[NameTypePair] = Util.findGlobalVars(ir.code)
 
-  convertGlobal(ir.prog)
+  convertGlobal(ir.code)
 }

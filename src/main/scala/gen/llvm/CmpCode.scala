@@ -6,6 +6,7 @@ object CmpCode extends Enumeration {
   val NE: CmpCode.Value = Value("ne")
   val SGT: CmpCode.Value = Value("sgt")
   val SLT: CmpCode.Value = Value("slt")
+  val SGE: CmpCode.Value = Value("sge")
   val SLE: CmpCode.Value = Value("sle")
   
 }

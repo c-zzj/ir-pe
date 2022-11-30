@@ -33,10 +33,18 @@ define i32 @main () { ; i32()*
     %Offset = getelementptr {i8,i32*}, ptr null, i32 0, i32 0
     %OffsetI = ptrtoint i32** %Offset to i8
     %x = add i8 %OffsetI, 48
-    call i32 @putchar(i8 %x)
+    %foores = call i8 @foo()
+    call i32 @putchar(i8 %foores)
 
     ret i32 0
 }
+
+define i8 @foo () {
+    %res = load i8, ptr @.int2
+    ret i8 %res
+}
+
+@.int2 = global i8 103
 
 ; Named metadata
 !0 = !{i32 42, null, !"string"}

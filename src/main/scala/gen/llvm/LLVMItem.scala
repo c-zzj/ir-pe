@@ -3,15 +3,17 @@ package gen.llvm
 trait LLVMItem:
   def toLL: String
 
-case class Comment(message: String) extends LLVMItem:
+trait LLVMGlobalItem extends LLVMItem
+
+case class Comment(message: String) extends LLVMGlobalItem:
   override def toLL: String = "; " + message
 
-case class FunDef(resultType: Type,
+case class FunDef(resultType: LLType,
                   funName: GlobalIdentifier,
-                  argList: List[(Type, LocalIdentifier)],
-                  body: List[Instruction],
+                  argList: List[(LLType, LocalIdentifier)],
+                  body: List[LLVMItem],
                   prefix: String = "",
-                  postfix: String = "") extends LLVMItem:
+                  postfix: String = "") extends LLVMGlobalItem:
   override def toLL: String =
     String.join(" ",
       "define",
@@ -19,16 +21,16 @@ case class FunDef(resultType: Type,
       resultType.toLL,
       funName.toLL + "(" + Util.join(", ", argList.map((t, i) => t.toLL + " " + i.toLL)) + ")",
       postfix,
-      "{\n"+ body.foldLeft("")((s: String, i: Instruction) => s + '\t' + i.toLL + '\n') + "}\n"
+      "{\n"+ body.foldLeft("")((s: String, i: LLVMItem) => s + '\t' + i.toLL + '\n') + "}\n"
     )
 
 
 
-case class FunDecl(resultType: Type,
+case class FunDecl(resultType: LLType,
                    funName: GlobalIdentifier,
-                   argList: List[(Type, LocalIdentifier)],
+                   argList: List[(LLType, LocalIdentifier)],
                    prefix: String = "",
-                   postfix: String = "") extends LLVMItem:
+                   postfix: String = "") extends LLVMGlobalItem:
   override def toLL: String =
     String.join(" ",
       "declare",
@@ -38,7 +40,7 @@ case class FunDecl(resultType: Type,
       postfix
     )
 
-case class GlobalVar(varName: GlobalIdentifier, constant: Constant) extends LLVMItem:
+case class GlobalVar(varName: GlobalIdentifier, constant: Constant) extends LLVMGlobalItem:
   override def toLL: String = String.join(" ",
     varName.toLL,
     "=",

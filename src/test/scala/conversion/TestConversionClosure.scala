@@ -5,10 +5,10 @@ import conversion.{Stmt, ConversionClosure, PPrint}
 class TestConversionClosure extends AnyFlatSpec {
   def test(ir: IR): Unit =
     println("-------BEFORE CONVERSION--------")
-    println(PPrint.prettyPrint(ir.prog))
+    println(PPrint.prettyPrint(ir.code))
     ConversionClosure(ir)
     println("-------AFTER CONVERSION--------")
-    println(PPrint.prettyPrint(ir.prog))
+    println(PPrint.prettyPrint(ir.code))
 
   "A closure conversion" should "not throw any exception" in {
     /**

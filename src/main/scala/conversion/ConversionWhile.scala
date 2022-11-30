@@ -50,7 +50,7 @@ class ConversionWhile(ir: IR) {
     s match
       case s: While =>
         val recAssignment = createWhileFn(s, params.toList, retType)
-        ir.prog.stmts.add(recAssignment)
+        ir.code.stmts.add(recAssignment)
         parentBlock.stmts.insertAfter(s,
           Apply(
             Var(recAssignment.name, recAssignment.value.eType),
@@ -58,7 +58,7 @@ class ConversionWhile(ir: IR) {
           )
         )
         parentBlock.stmts.remove(s)
-        convertWhile(recAssignment, ir.prog, mutable.ArrayBuffer.empty[NameTypePair], insideFun, retType)
+        convertWhile(recAssignment, ir.code, mutable.ArrayBuffer.empty[NameTypePair], insideFun, retType)
 
       case s: Assign =>
         if insideFun then params.addOne(NameTypePair(s.name, s.value.eType))
@@ -73,10 +73,6 @@ class ConversionWhile(ir: IR) {
         s.stmts.foreach(s_ => convertWhile(s_, s, params, insideFun, retType))
       case s: Return =>
         convertWhile(s.value, parentBlock, params, insideFun, retType)
-      case s: SetElementAt =>
-        convertWhile(s.array, parentBlock, params, insideFun, retType)
-        convertWhile(s.index, parentBlock, params, insideFun, retType)
-        convertWhile(s.elm, parentBlock, params, insideFun, retType)
       case s: BinOp => ;
         convertWhile(s.lhs, parentBlock, params, insideFun, retType)
         convertWhile(s.rhs, parentBlock, params, insideFun, retType)
@@ -108,5 +104,5 @@ class ConversionWhile(ir: IR) {
       case VoidE => ;
 
   private val initialParams = mutable.ArrayBuffer.empty[NameTypePair]
-  ir.prog.stmts.foreach(s => convertWhile(s, ir.prog, initialParams))
+  ir.code.stmts.foreach(s => convertWhile(s, ir.code, initialParams))
 }
