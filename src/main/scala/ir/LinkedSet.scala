@@ -1,4 +1,4 @@
-package conversion
+package ir
 import parser.Token.Type.False
 
 import scala.collection.mutable

@@ -1,6 +1,6 @@
-package conversion
+package ir
 import org.scalatest.flatspec.AnyFlatSpec
-import conversion.{Stmt, ConversionWhile, PPrint}
+import ir.{Stmt, ConversionWhile, PPrint}
 
 class TestConversionWhile extends AnyFlatSpec{
   def test(ir: IR): Unit =

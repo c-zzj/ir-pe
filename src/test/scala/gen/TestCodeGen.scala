@@ -1,6 +1,6 @@
 package gen
 import org.scalatest.flatspec.AnyFlatSpec
-import conversion.*
+import ir.*
 import gen.CodeGen
 
 import java.io.File

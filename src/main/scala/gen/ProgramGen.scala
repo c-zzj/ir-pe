@@ -1,7 +1,7 @@
 package gen
 
 import gen.llvm.*
-import conversion.*
+import ir.*
 
 import scala.collection.mutable
 

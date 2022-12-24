@@ -1,6 +1,6 @@
-package conversion
+package ir
 
-import conversion.{BlockNode, Stmt}
+import ir.{BlockNode, Stmt}
 import scala.collection.mutable
 
 /**

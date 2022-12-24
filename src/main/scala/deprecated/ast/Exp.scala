@@ -1,4 +1,4 @@
-package ast
+package deprecated.ast
 
 import scala.annotation.targetName
 

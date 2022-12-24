@@ -1,6 +1,6 @@
 package gen
 
-import conversion.IR
+import ir.IR
 import llvm._
 
 import java.io.{File, PrintWriter}

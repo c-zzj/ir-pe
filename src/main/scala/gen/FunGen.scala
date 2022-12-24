@@ -1,7 +1,7 @@
 package gen
 
 import gen.llvm.*
-import conversion.*
+import ir.*
 import gen.CodegenUtil.ShouldNotReach
 import gen.llvm.Instruction.Unreachable
 import gen.llvm.LLType.{TInt, TOpaquePtr, TStruct, TVoid}

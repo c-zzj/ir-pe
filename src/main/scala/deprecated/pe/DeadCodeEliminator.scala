@@ -1,8 +1,7 @@
-package pe
-
-import ast.*
+package deprecated.pe
 
 import scala.collection.mutable
+import deprecated.ast.*
 
 class DeadCodeEliminator:
   // post order traversal

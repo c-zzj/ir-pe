@@ -1,6 +1,6 @@
 package gen
 
-import conversion._
+import ir._
 import gen.llvm.{ArrayConstant, Constant, IntConstant, LLType, StringConstant, StructConstant}
 
 object CodegenUtil {
