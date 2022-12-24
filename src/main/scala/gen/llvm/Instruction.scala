@@ -13,7 +13,7 @@ object Instruction {
   case class Return(retType: LLType, retValue: Identifier) extends Terminator :
     def this() = this(TVoid, LocalIdentifier("placeholder"))
     override def toLL: String =
-      if retType == TVoid then RET.asmCode + TVoid.toLL
+      if retType == TVoid then RET.asmCode + " " + TVoid.toLL
       else String.join(" ", RET.asmCode, retType.toLL, retValue.toLL)
 
   case class Branch(dest: Label) extends Terminator :
@@ -52,7 +52,7 @@ object Instruction {
     override def toLL: String = String.join(" ", res.toLL, "=", opCode.asmCode, typeFrom.toLL, valueFrom.toLL, "to", typeTo.toLL)
 
   case class Compare(res: LocalIdentifier, cond: CmpCode, valType: LLType, op1: Identifier, op2: Identifier) extends Instruction:
-    override def toLL: String = String.join(" ", res.toLL, "=", ICMP.asmCode, cond.toString, valType.toLL, op1.toLL, op2.toLL)
+    override def toLL: String = String.join(" ", res.toLL, "=", ICMP.asmCode, cond.toString, valType.toLL, op1.toLL + ", " + op2.toLL)
 
   case class Phi(res: LocalIdentifier, valType: LLType, valLabelPairs: List[(Identifier, Label)]) extends Instruction:
     override def toLL: String =
@@ -68,9 +68,12 @@ object Instruction {
         res match
           case Some(id) =>
             String.join(" ", id.toLL, "=", CALL.asmCode, valType.toLL, funVal.toLL + "(" + argString + ")")
-          case None => String.join(CALL.asmCode, valType.toLL, funVal.toLL + "(" + argString + ")")
+          case None => String.join(" ", CALL.asmCode, valType.toLL, funVal.toLL + "(" + argString + ")")
       else
-        String.join(CALL.asmCode, valType.toLL, funVal.toLL + "(" + argString + ")")
+        String.join(" ", CALL.asmCode, valType.toLL, funVal.toLL + "(" + argString + ")")
+
+  case object Unreachable extends Instruction:
+    override def toLL: String = "unreachable"
 
   /**
    * Calculate the size of a LLVM type. The result has type i32.

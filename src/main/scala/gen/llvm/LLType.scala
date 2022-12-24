@@ -15,7 +15,7 @@ object LLType {
     override def toLL: String = retType.toString + " " + argTypeList.toString.substring(4)
 
   case class TPtr(contentType: LLType) extends LLType:
-    override def toLL: String = contentType.toString + "*"
+    override def toLL: String = contentType.toLL + "*"
 
   case object TOpaquePtr extends LLType:
     override def toLL: String = "ptr"

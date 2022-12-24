@@ -7,13 +7,8 @@ class ConversionWhile(ir: IR) {
     ir.varCounter += 1
     val recName = ir.varCounter.toString
     val recBlock = Block()
-    val fnType = IRFunction(retType, params.map(p => p.tp))
     val recFn = Rec(recName,
-      Fn(params.map(p => p.name),
-        recBlock,
-        tp = fnType
-      ),
-      fnType
+      Fn(params, recBlock, retType)
     )
 
     def convertContinueBreak(s: Stmt): Stmt =
@@ -46,7 +41,11 @@ class ConversionWhile(ir: IR) {
 
 
 
-  def convertWhile(s: Stmt, parentBlock: Block, params: mutable.ArrayBuffer[NameTypePair], insideFun: Boolean = false, retType: IRType = Undefined): Unit =
+  def convertWhile(s: Stmt,
+                   parentBlock: Block,
+                   params: mutable.ArrayBuffer[NameTypePair],
+                   insideFun: Boolean = false,
+                   retType: IRType = Undefined): Unit =
     s match
       case s: While =>
         val recAssignment = createWhileFn(s, params.toList, retType)
@@ -79,7 +78,7 @@ class ConversionWhile(ir: IR) {
       case s: (StrLiteral | IntLiteral | Var) => ;
       case s: Fn =>
         val newParams = mutable.ArrayBuffer.from(params)
-        newParams.addAll(s.paramNameTypePairs)
+        newParams.addAll(s.params)
         convertWhile(s.body, s.body, newParams, true, s.eType match
           case IRFunction(retType, _) => retType
           case _ => Undefined
@@ -101,6 +100,7 @@ class ConversionWhile(ir: IR) {
         convertWhile(s.index, parentBlock, params, insideFun, retType)
         convertWhile(s.array, parentBlock, params, insideFun, retType)
         convertWhile(s.elm, parentBlock, params, insideFun, retType)
+      case s: ConvertInt => convertWhile(s.int, parentBlock, params, insideFun, retType)
       case VoidE => ;
 
   private val initialParams = mutable.ArrayBuffer.empty[NameTypePair]

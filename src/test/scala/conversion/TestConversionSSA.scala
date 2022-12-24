@@ -1,6 +1,6 @@
 package conversion
 import org.scalatest.flatspec.AnyFlatSpec
-import conversion.{Stmt, ConversionSSA, PPrint}
+import conversion.{ConversionSSA, PPrint, Stmt}
 
 
 class TestConversionSSA extends AnyFlatSpec{
@@ -25,14 +25,14 @@ class TestConversionSSA extends AnyFlatSpec{
 
     val b2 = Block(
       Assign("x", IntLiteral(1)),
-      Assign("f", Fn(List("p"), Block(
-        If(
-          IntLiteral(1),
-          Block(Assign("p", Var("x"))),
-          Block(Assign("p", Var("p")))
-        ),
-        Return(Var("p"))
-      ))),
+      Assign("f", Fn(List(NameTypePair("p", IRInt(32))), Block(
+              If(
+                IntLiteral(1),
+                Block(Assign("p", Var("x"))),
+                Block(Assign("p", Var("p")))
+              ),
+              Return(Var("p"))
+            ), IRInt(32))),
       Apply(Var("f"), List(IntLiteral(3)))
     )
     test(b2)
@@ -54,10 +54,10 @@ class TestConversionSSA extends AnyFlatSpec{
     val b4 = Block(
       Assign("x", IntLiteral(1)),
       Assign("f", Rec("f", Fn(List(), Block(
-        Assign("y", Var("x")),
-        Assign("x", Var("x")),
-        Apply(Var("f"), List())
-      )))),
+              Assign("y", Var("x")),
+              Assign("x", Var("x")),
+              Apply(Var("f"), List())
+            ), IRInt(32)))),
       Assign("x", IntLiteral(2))
     )
 

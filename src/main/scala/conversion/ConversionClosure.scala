@@ -5,45 +5,75 @@ import scala.collection.mutable
 class ConversionClosure(ir: IR) {
   def convertClosure(function: Fn | Rec): Unit =
 
-    def rename(env: List[NameTypePair], fn: Fn | Rec): Unit =
-      val nameMap = mutable.HashMap.empty[String, String]
-      var envRenamed = List.empty[NameTypePair]
-      env.foreach(pair => {
-        pair match
-          case NameTypePair(name, tp) =>
-            ir.varCounter += 1
-            val newName = ir.varCounter.toString
-            envRenamed = envRenamed.appended(NameTypePair(newName, tp))
-            nameMap.put(name, newName)
-      })
+    /**
+     * replace variables in the environments in the closure with access to the environment struct (last argument)
+     * @param env the environment
+     * @param fn the closure
+     */
+    def rename(env: List[NameTypePair], fn: Fn | Rec, envArg: NameTypePair, envVarPosMap: mutable.Map[String, Int]): Unit =
       val f = fn match
         case e: Rec => e.fn
         case e: Fn => e
-
-      f.env = envRenamed
       rename_(f.body)
 
-      def rename_(e: Stmt): Unit =
+      def rename_(e: Stmt): Stmt =
         e match
-          case e: Assign => rename_(e.value);
-          case e: Block => e.stmts.foreach(rename_);
-          case e: If => rename_(e.cond); rename_(e.bThen); rename_(e.bElse);
-          case e: Return => rename_(e.value);
-          case e: BinOp => rename_(e.lhs); rename_(e.rhs);
-          case _: StrLiteral => ;
-          case _: IntLiteral => ;
-          case e: Var => if nameMap.contains(e.name) then e.name = nameMap(e.name);
-          case e: Fn => rename_(e.body);
-          case e: Rec => rename_(e.fn);
-          case e: Apply => rename_(e.fn); e.args.foreach(rename_);
-          case e: InitArr => rename_(e.size);
-          case _: InitStruct => ;
-          case e: StructArrLiteral => e.elements.foreach(rename_);
-          case e: GetElementAt => rename_(e.array); rename_(e.index);
-          case e: SetElementAt => rename_(e.array); rename_(e.index); rename_(e.elm)
-          case VoidE => ;
+          case e: Assign => e.value = rename_(e.value).asInstanceOf[Exp]; e
+          case e: Block => e.stmts = e.stmts.map(rename_); e
+          case e: If =>
+            e.cond = rename_(e.cond).asInstanceOf[Exp]
+            e.bThen = rename_(e.bThen) match
+              case b: Block => b
+              case b => throw RuntimeException(b.toString + " is not a block")
+            e.bElse = rename_(e.bElse) match
+              case b: Block => b
+              case b => throw RuntimeException(b.toString + " is not a block")
+            e
+          case e: Return =>
+            e.value = rename_(e.value).asInstanceOf[Exp]
+            e
+          case e: BinOp =>
+            e.lhs = rename_(e.lhs).asInstanceOf[Exp]
+            e.rhs = rename_(e.rhs).asInstanceOf[Exp]
+            e
+          case e: StrLiteral => e;
+          case e: IntLiteral => e;
+          case e: Var =>
+            if envVarPosMap.contains(e.name) then
+            GetElementAt(Var(envArg.name, envArg.tp), IntLiteral(envVarPosMap(e.name), 32))
+            else e
+          case e: Apply =>
+            e.fn = rename_(e.fn).asInstanceOf[Exp]
+            e.args = e.args.map(rename_).map(e_ => e_.asInstanceOf[Exp])
+            e
+          case e: InitArr =>
+            e.size = rename_(e.size).asInstanceOf[Exp]
+            e
+          case e: InitStruct => e
+          case e: StructArrLiteral =>
+            e.elements = e.elements.map(rename_).map(e_ => e_.asInstanceOf[Exp])
+            e
+          case e: GetElementAt =>
+            e.array = rename_(e.array).asInstanceOf[Exp]
+            e.index = rename_(e.index).asInstanceOf[Exp]
+            e
+          case e: SetElementAt =>
+            e.array = rename_(e.array).asInstanceOf[Exp]
+            e.index = rename_(e.index).asInstanceOf[Exp]
+            e.index = rename_(e.elm).asInstanceOf[Exp]
+            e
+          case e: Fn => rename_(e.body).asInstanceOf[Block]; e
+          case e: Rec => rename_(e.fn).asInstanceOf[Fn]; e
+          case e: ConvertInt => e.int = rename_(e.int).asInstanceOf[Exp]; e
+          case VoidE => VoidE;
 
-    def getClosure(e: Fn | Rec): InitClosure =
+    /**
+     * create a function in global scope for the closure
+     *
+     * @param e the closure
+     * @return the IR representation of the closure
+     */
+    def createClosure(e: Fn | Rec): StructArrLiteral =
       ir.varCounter += 1;
       val g = ir.varCounter.toString
       ir.code.stmts.prepend(Assign(g, e))
@@ -51,10 +81,34 @@ class ConversionClosure(ir: IR) {
         case e: Rec => e.fn
         case e: Fn => e
       val env = Util.findFreeVars(f).diff(globalVars)
-      rename(env.toList, f)
-      convertClosure(e)
-      InitClosure(env.toList, NameTypePair(g, e.eType))
 
+      ir.varCounter += 1
+      val envArgName = ir.varCounter.toString
+
+      val envList = env.map(pair => Var(pair.name, pair.tp)).toList
+      val envStruct = StructArrLiteral(envList)
+      val res = StructArrLiteral(List(e, envStruct))
+
+      val envVarPosMap: mutable.Map[String, Int] = mutable.HashMap.empty[String, Int]
+      var i = 0
+      envList.foreach(v => {
+        envVarPosMap.put(v.name, i)
+        i += 1
+      })
+
+      val envArg = NameTypePair(envArgName, envStruct.eType)
+
+      f.params = f.params.appended(envArg)
+
+      rename(env.toList, f, envArg, envVarPosMap)
+
+      res
+
+    /**
+     * traverse the statement and convert closures inside
+     * @param e statement to be traversed on
+     * @return the statement after conversion
+     */
     def convertClosure_(e: Stmt): Stmt =
       e match
         case e: Assign => e.value = convertClosure_(e.value).asInstanceOf[Exp]; e
@@ -98,8 +152,9 @@ class ConversionClosure(ir: IR) {
           e.index = convertClosure_(e.index).asInstanceOf[Exp]
           e.index = convertClosure_(e.elm).asInstanceOf[Exp]
           e
-        case e: Fn=> getClosure(e)
-        case e: Rec => getClosure(e)
+        case e: Fn=> val closure = createClosure(e); convertClosure(e); closure
+        case e: Rec => val closure = createClosure(e); convertClosure(e); closure
+        case e: ConvertInt => convertClosure_(e.int); e
         case VoidE => VoidE;
 
 
@@ -130,10 +185,40 @@ class ConversionClosure(ir: IR) {
       case e: StructArrLiteral => e.elements.foreach(convertGlobal);
       case e: GetElementAt => convertGlobal(e.array); convertGlobal(e.index);
       case e: SetElementAt => convertGlobal(e.array); convertGlobal(e.index); convertGlobal(e.elm);
+      case e: ConvertInt => convertGlobal(e.int);
       case VoidE => ;
 
+  def convertApply(e: Stmt): Unit =
+    e match
+      case e: Assign => convertApply(e.value);
+      case e: Block => e.stmts.foreach(convertApply);
+      case e: If => convertApply(e.cond); convertApply(e.bThen); convertApply(e.bElse);
+      case e: Return => convertApply(e.value);
+      case e: BinOp => convertApply(e.lhs); convertApply(e.rhs);
+      case _: StrLiteral => ;
+      case _: IntLiteral => ;
+      case _: Var => ;
+      case e: Fn => convertApply(e.body);
+      case e: Rec => convertApply(e.fn);
+      case e: Apply =>
+        e.args.foreach(convertApply)
+        convertApply(e.fn);
+        e.fn.eType match
+        case IRStruct(_) =>
+          e.fn = GetElementAt(e.fn, IntLiteral(0, 32))
+          e.args = e.args.appended(GetElementAt(e.fn, IntLiteral(1, 32)))
+        case IRFunction(_, _) => ;
+
+      case e: InitArr => convertApply(e.size);
+      case _: InitStruct => ;
+      case e: StructArrLiteral => e.elements.foreach(convertApply);
+      case e: GetElementAt => convertApply(e.array); convertApply(e.index);
+      case e: SetElementAt => convertApply(e.array); convertApply(e.index); convertApply(e.elm);
+      case e: ConvertInt => convertApply(e.int)
+      case VoidE => ;
 
   val globalVars: mutable.Set[NameTypePair] = Util.findGlobalVars(ir.code)
 
   convertGlobal(ir.code)
+  convertApply(ir.code)
 }

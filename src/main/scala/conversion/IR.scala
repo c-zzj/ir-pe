@@ -48,34 +48,30 @@ class StrLiteral(val str: String) extends Exp:
 class IntLiteral(val int: Int, val numBits: Int = 32) extends Exp:
   override def eType: IRType = IRInt(numBits)
 
+class ConvertInt(var int: Exp, val targetNumBits: Int) extends Exp:
+  override def eType: IRType = IRInt(targetNumBits)
+
 class Var(var name: String, var tp: IRType = Undefined) extends Exp:
   override def eType: IRType = tp
 
 case class NameTypePair(name: String, tp: IRType)
 
-class Fn(var params: List[String],
+class Fn(var params: List[NameTypePair],
          val body: Block,
+         var retType: IRType,
          val isRestricted: Boolean = false,
          val isSimplified: Boolean = false,
          val hasSideEffect: Boolean = false,
-         var env: List[NameTypePair] = List.empty[NameTypePair],
-         var tp: IRType = Undefined) extends Exp:
-  override def eType: IRType = tp
-
-  def paramNameTypePairs: List[NameTypePair] =
-    eType match
-      case t: IRFunction =>
-        (params zip t.argTypeList).map((name, tp) => NameTypePair(name, tp))
-      case _ => List()
+         var env: List[NameTypePair] = List.empty[NameTypePair]) extends Exp:
+  override def eType: IRType = IRFunction(retType, params.map(pair => pair.tp))
 
 
-class Rec(var name: String, var fn: Fn, var tp: IRType = Undefined) extends Exp:
-  override def eType: IRType = tp
+class Rec(var name: String, var fn: Fn) extends Exp:
+  override def eType: IRType = fn.eType
 
-class Apply(var fn: Exp, var args: List[Exp], var isClosure: Boolean = false) extends Exp:
+class Apply(var fn: Exp, var args: List[Exp]) extends Exp:
   override def eType: IRType = fn.eType match
-    case t: IRFunction => if ! isClosure then t.retType else Undefined
-    case t: IRClosure => if isClosure then t.retType else Undefined
+    case t: IRFunction => t.retType
     case _ => Undefined
 
 class InitArr(var size: Exp, var elmType: IRType) extends Exp:

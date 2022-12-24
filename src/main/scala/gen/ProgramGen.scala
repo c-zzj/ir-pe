@@ -7,9 +7,28 @@ import scala.collection.mutable
 
 
 class ProgramGen(val llvmProg: LLVMProgram):
+  def addBuiltInFunctions(section: Section): Unit ={
+    val builtin = List(
+      FunDecl(
+        LLType.TVoid, GlobalIdentifier("putchar"), List((LLType.TInt(8), "nocapture")), postfix = "nounwind"
+      ),
+      FunDecl(
+        LLType.TVoid, GlobalIdentifier("puts"), List((LLType.TPtr(LLType.TInt(8)), "nocapture")), postfix = "nounwind"
+      ),
+      FunDecl(
+        LLType.TPtr(LLType.TInt(8)), GlobalIdentifier("itoa"), List((LLType.TInt(32), "nocapture")), postfix = "nounwind"
+      ),
+      FunDecl(
+        LLType.TInt(32), GlobalIdentifier("atoi"), List((LLType.TPtr(LLType.TInt(8)), "nocapture")), postfix = "nounwind"
+      )
+    )
+
+    section.globals.addAll(builtin)
+  }
   def gen(program: IR): Unit =
     val globalDataSection = Section()
     llvmProg.sections.addOne(globalDataSection)
+    addBuiltInFunctions(globalDataSection)
 
     val globalVars = mutable.HashSet.empty[NameTypePair]
     val pInfo = ProgramInfo(globalVars)
@@ -20,8 +39,8 @@ class ProgramGen(val llvmProg: LLVMProgram):
         globalVars.add(NameTypePair(s.name, s.value.eType));
         s.value match
           case e: (IntLiteral | StrLiteral | StructArrLiteral) =>
-            val id = pInfo.getGlobalId
-            pInfo.varIdMap.put(s.name, id)
+            val id = pInfo.getGlobalId;
+            pInfo.varIdMap.put(s.name, id);
             globalDataSection.globals.addOne(
               GlobalVar(
                 id, CodegenUtil.convertConstant(e)
@@ -45,10 +64,16 @@ class ProgramInfo(val globalVars: mutable.Set[NameTypePair],
                   val blockLabelMap: mutable.Map[Block, Label] = mutable.HashMap.empty[Block, Label]):
   def getGlobalId: GlobalIdentifier =
     idCounter += 1
-    GlobalIdentifier(idCounter.toString)
+    GlobalIdentifier("_" + idCounter.toString)
 
   def getLocalId: LocalIdentifier =
     idCounter += 1
-    LocalIdentifier(idCounter.toString)
+    LocalIdentifier("_" + idCounter.toString)
 
+  def addBuiltinIds(): Unit =
+    varIdMap.addOne("puts", GlobalIdentifier("puts"))
+    varIdMap.addOne("putchar", GlobalIdentifier("putchar"))
+    varIdMap.addOne("itoa", GlobalIdentifier("itoa"))
+    varIdMap.addOne("atoi", GlobalIdentifier("atoi"))
 
+  addBuiltinIds()

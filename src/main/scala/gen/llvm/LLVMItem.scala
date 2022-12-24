@@ -28,7 +28,7 @@ case class FunDef(resultType: LLType,
 
 case class FunDecl(resultType: LLType,
                    funName: GlobalIdentifier,
-                   argList: List[(LLType, LocalIdentifier)],
+                   argList: List[(LLType, String)],
                    prefix: String = "",
                    postfix: String = "") extends LLVMGlobalItem:
   override def toLL: String =
@@ -36,7 +36,7 @@ case class FunDecl(resultType: LLType,
       "declare",
       prefix,
       resultType.toLL,
-      funName.toLL + "(" + Util.join(", ", argList.map((t, i) => t.toLL + " " + i.toLL)) + ")",
+      funName.toLL + "(" + Util.join(", ", argList.map((t, i) => t.toLL + " " + i)) + ")",
       postfix
     )
 

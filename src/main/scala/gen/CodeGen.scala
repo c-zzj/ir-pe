@@ -4,7 +4,7 @@ import conversion.IR
 import llvm._
 
 import java.io.{File, PrintWriter}
-class CodeGen {
+object CodeGen {
   def emitProgram(ir: IR, outputFile: File): Unit =
     val llvmProg = LLVMProgram()
     val progGen = ProgramGen(llvmProg)

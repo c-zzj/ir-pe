@@ -24,6 +24,7 @@ class ControlFlowGraph(program: Block) {
       case e: StructArrLiteral => e.elements.foreach(e_ => applyToFn(e_, f))
       case e: GetElementAt => applyToFn(e.array, f); applyToFn(e.index, f)
       case e: SetElementAt => applyToFn(e.array, f); applyToFn(e.index, f); applyToFn(e.elm, f)
+      case e: ConvertInt => applyToFn(e.int, f)
 
 
   /**

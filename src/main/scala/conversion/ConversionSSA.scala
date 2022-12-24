@@ -18,7 +18,7 @@ class ConversionSSA(program: Block) {
               val var_blocks = nameBlockMap.getOrElseUpdate(pair.name, mutable.HashSet.empty[BlockNode]);
               var_blocks.add(block)
             }
-            block.fn.paramNameTypePairs.foreach(addBlock)
+            block.fn.params.foreach(addBlock)
             block.fn.env.foreach(addBlock)
         case _ => ;
       }
@@ -170,15 +170,15 @@ class ConversionSSA(program: Block) {
     val indexStack = mutable.HashMap.empty[String, mutable.Stack[Integer]]
 
     // update the counter and index stack and return the new name for a given variable name
-    def newName(pair: NameTypePair): String =
-      if globalVariables.contains(pair) then return pair.name + "_" + 0
+    def newName(pair: NameTypePair): NameTypePair =
+      if globalVariables.contains(pair) then return NameTypePair(pair.name + "_" + 0, pair.tp)
       pair match
         case NameTypePair(n, _) =>
           val i = nameCounter.getOrElseUpdate(n, 0)
           nameCounter.put(n, i + 1)
           val name = n + "_" + i
           indexStack.getOrElseUpdate(n, mutable.Stack.empty[Integer]).push(i)
-          name
+          NameTypePair(name, pair.tp)
 
     // get the current name of the original name of a variable
     def curName(n: String): String =
@@ -203,6 +203,7 @@ class ConversionSSA(program: Block) {
         case e: StructArrLiteral => e.elements.foreach(e_ => rewrite(e_))
         case e: GetElementAt => rewrite(e.array); rewrite(e.index)
         case e: SetElementAt => rewrite(e.array); rewrite(e.index); rewrite(e.elm)
+        case e: ConvertInt => rewrite(e.int)
         case _: Phi => ;
 
     /**
@@ -218,15 +219,15 @@ class ConversionSSA(program: Block) {
       blockNode match
         case blockNode: FnBlockNode =>
           if blockNode == cfg.funBlockMap(blockNode.fn) then
-            blockNode.fn.params = blockNode.fn.paramNameTypePairs.map(newName)
-            blockNode.fn.env = blockNode.fn.env.map(pair => NameTypePair(newName(pair), pair.tp))
+            blockNode.fn.params = blockNode.fn.params.map(newName)
+            blockNode.fn.env = blockNode.fn.env.map(pair => newName(pair))
         case _ => ;
 
       blockNode.elements.foreach((s: Stmt) =>
         s match
           case s: Assign =>
             rewrite(s.value);
-            s.name = newName(NameTypePair(s.name, s.value.eType));
+            s.name = newName(NameTypePair(s.name, s.value.eType)).name;
           case s: If => rewrite(s.cond)
           case s: Return => rewrite(s.value)
           case s: Exp => rewrite(s)

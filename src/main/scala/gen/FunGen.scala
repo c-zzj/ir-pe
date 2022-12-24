@@ -2,6 +2,8 @@ package gen
 
 import gen.llvm.*
 import conversion.*
+import gen.CodegenUtil.ShouldNotReach
+import gen.llvm.Instruction.Unreachable
 import gen.llvm.LLType.{TInt, TOpaquePtr, TStruct, TVoid}
 
 import collection.mutable
@@ -10,6 +12,8 @@ class FunGen(val pInfo: ProgramInfo) {
   def gen(section: Section, fn: Fn, fnName: String): Unit =
     val fnInstructions = mutable.ListBuffer.empty[LLVMItem]
     val expGen = ExpGen(pInfo, section, fnInstructions)
+    fn.params.foreach(pair => pInfo.varIdMap.put(pair.name, pInfo.getLocalId))
+    pInfo.varIdMap.put(fnName, GlobalIdentifier(fnName))
 
     def gen_(stmt: Stmt): Unit =
       stmt match
@@ -47,12 +51,13 @@ class FunGen(val pInfo: ProgramInfo) {
           expGen.gen(s)
 
     gen_(fn.body)
+    fnInstructions.addOne(Unreachable) // add one instruction at the end for If statement to jump out to
     fn.eType match
-      case IRFunction(retType, argTypeList) =>
+      case IRFunction(retType, _) =>
         section.globals.addOne(FunDef(
           CodegenUtil.convertType(retType),
-          GlobalIdentifier(fnName),
-          argTypeList.map(CodegenUtil.convertType) zip fn.params.map(LocalIdentifier.apply),
+          pInfo.varIdMap(fnName).asInstanceOf[GlobalIdentifier],
+          fn.params.map(pair => (CodegenUtil.convertType(pair.tp), pInfo.varIdMap(pair.name).asInstanceOf[LocalIdentifier])),
           fnInstructions.toList
         ))
       case _ => throw CodegenUtil.ShouldNotReach()
@@ -66,8 +71,7 @@ class ExpGen(val pInfo: ProgramInfo, val curSection: Section, val fnInstructions
       case e: BinOp =>
         val lhs = gen(e.lhs)
         val rhs = gen(e.rhs)
-        pInfo.idCounter += 1
-        val res = LocalIdentifier(pInfo.idCounter.toString)
+        val res = pInfo.getLocalId
         e.op match
           case Op.GT | Op.LT | Op.GE | Op.LE | Op.EQ | Op.NE =>
             val cmp = e.op match
@@ -83,14 +87,14 @@ class ExpGen(val pInfo: ProgramInfo, val curSection: Section, val fnInstructions
               case Op.ADD => OpCode.ADD
               case Op.SUB => OpCode.SUB
               case Op.MUL => OpCode.MUL
+              case Op.DIV => OpCode.SDIV
               case Op.MOD => OpCode.SREM
               case Op.OR => OpCode.OR
               case Op.AND => OpCode.AND
             fnInstructions.addOne(Instruction.BinaryInstruction(res, op, CodegenUtil.convertType(e.lhs.eType), lhs, rhs))
         res
       case e: StrLiteral =>
-        pInfo.idCounter += 1
-        val res = GlobalIdentifier(pInfo.idCounter.toString)
+        val res = pInfo.getGlobalId
         curSection.globals.addOne(GlobalVar(res, CodegenUtil.convertConstant(e)))
         res
       case e: IntLiteral => CodegenUtil.convertConstant(e)
@@ -123,7 +127,6 @@ class ExpGen(val pInfo: ProgramInfo, val curSection: Section, val fnInstructions
               )
               res
           case _ => throw CodegenUtil.ShouldNotReach()
-      case e: InitClosure => null
       case e: InitArr =>
         val arraySize = gen(e.size)
         val tmp = pInfo.getLocalId
@@ -175,6 +178,14 @@ class ExpGen(val pInfo: ProgramInfo, val curSection: Section, val fnInstructions
         val res = pInfo.getLocalId
         val sources = e.from.toList.map((block: Block, name: String) => (pInfo.varIdMap(name), pInfo.blockLabelMap(block)))
         fnInstructions.addOne(Instruction.Phi(res, CodegenUtil.convertType(e.eType), sources))
+        res
+      case e: ConvertInt =>
+        val from = gen(e.int)
+        val res = pInfo.getLocalId
+        val op = e.int.eType match
+          case IRInt(numBits) => if numBits > e.targetNumBits then OpCode.TRUNC else OpCode.SEXT
+          case _ => throw ShouldNotReach("non int source expression in integer conversion")
+        fnInstructions.addOne(Instruction.Cast(res, op, CodegenUtil.convertType(e.int.eType), from, CodegenUtil.convertType(e.eType)))
         res
       case VoidE => null
 

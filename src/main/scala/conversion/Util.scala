@@ -39,7 +39,7 @@ object Util {
   def findFreeVars(e: Fn): mutable.Set[NameTypePair] =
     val freeVars = mutable.HashSet.empty[NameTypePair]
     val declaredVars = mutable.HashSet.empty[NameTypePair]
-    declaredVars.addAll(e.paramNameTypePairs)
+    declaredVars.addAll(e.params)
 
     def findFreeVars_(e: Stmt): Unit =
       e match
