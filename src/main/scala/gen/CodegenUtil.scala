@@ -26,6 +26,7 @@ object CodegenUtil {
       case IRArray(elmType, size) => LLType.TOpaquePtr
       case IRStruct(elmTypeList) => LLType.TOpaquePtr
       case IRVoid => LLType.TVoid
+      case Undefined => LLType.TUnknown
 
   def convertContentType(irT: IRType): LLType =
     irT match
@@ -36,4 +37,5 @@ object CodegenUtil {
         case None => throw ShouldNotReach()
       case IRStruct(elmTypeList) => LLType.TStruct(elmTypeList.map(convertType))
       case IRVoid => LLType.TVoid
+      case Undefined => LLType.TUnknown
 }

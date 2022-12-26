@@ -20,6 +20,9 @@ class ProgramGen(val llvmProg: LLVMProgram):
       ),
       FunDecl(
         LLType.TInt(32), GlobalIdentifier("atoi"), List((LLType.TPtr(LLType.TInt(8)), "nocapture")), postfix = "nounwind"
+      ),
+      FunDecl(
+        LLType.TPtr(LLType.TInt(8)), GlobalIdentifier("malloc"), List((LLType.TInt(32), "nocapture")), postfix = "nounwind"
       )
     )
 
@@ -75,5 +78,6 @@ class ProgramInfo(val globalVars: mutable.Set[NameTypePair],
     varIdMap.addOne("putchar", GlobalIdentifier("putchar"))
     varIdMap.addOne("itoa", GlobalIdentifier("itoa"))
     varIdMap.addOne("atoi", GlobalIdentifier("atoi"))
+    varIdMap.addOne("malloc", GlobalIdentifier("malloc"))
 
   addBuiltinIds()

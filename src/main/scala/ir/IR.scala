@@ -86,7 +86,12 @@ class StructArrLiteral(var elements: List[Exp], var isArr: Boolean = false) exte
     else IRStruct(elements.map(e => e.eType))
 
 class GetElementAt(var array: Exp, var index: Exp) extends Exp:
-  override def eType: IRType = Undefined
+  override def eType: IRType = array.eType match
+    case IRArray(elmType, _) => elmType
+    case IRStruct(elmTypeList) => index match
+      case i: IntLiteral => elmTypeList(i.int)
+      case _ => Undefined
+    case _ => Undefined
 
 class SetElementAt(var array: Exp, var index: Exp, var elm: Exp) extends Exp:
   override def eType: IRType = IRVoid

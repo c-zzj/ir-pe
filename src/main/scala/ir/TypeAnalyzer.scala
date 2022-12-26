@@ -93,6 +93,8 @@ class TypeAnalyzer(ir: IR) {
     nameTypeMap.put("puts", IRFunction(IRVoid, List(IRArray(IRInt(8)))))
     nameTypeMap.put("putchar", IRFunction(IRVoid, List(IRInt(8))))
     nameTypeMap.put("itoa", IRFunction(IRArray(IRInt(8)), List(IRInt(32))))
+    nameTypeMap.put("atoi", IRFunction(IRInt(32), List(IRArray(IRInt(8)))))
+    nameTypeMap.put("malloc", IRFunction(IRArray(IRInt(8)), List(IRInt(32))))
 
   addBuiltinFnTypes()
   ir.code.stmts.foreach(s => analyzeStmt(s, nameTypeMap))

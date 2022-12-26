@@ -2,6 +2,7 @@ declare  void @putchar(i8 nocapture) nounwind
 declare  void @puts(i8* nocapture) nounwind
 declare  i8* @itoa(i32 nocapture) nounwind
 declare  i32 @atoi(i8* nocapture) nounwind
+declare  i8* @malloc(i32 nocapture) nounwind
 define  void @printi(i32 %_1)  {
 	%_2 = icmp sgt i32 %_1, 9
 	br i1 %_2, label %LABEL_0, label %LABEL_1
@@ -20,29 +21,20 @@ define  void @printi(i32 %_1)  {
 	unreachable
 }
 
-define  i32 @fibonacci(i32 %_7)  {
-	%_8 = icmp eq i32 %_7, 1
-	%_9 = icmp eq i32 %_7, 2
-	%_10 = or i1 %_8, %_9
-	br i1 %_10, label %LABEL_3, label %LABEL_4
-	LABEL_3:
-	ret i32 1
-	br label %LABEL_5
-	LABEL_4:
-	%_11 = sub i32 %_7, 1
-	%_12 = call i32 @fibonacci(i32 %_11)
-	%_13 = sub i32 %_7, 2
-	%_14 = call i32 @fibonacci(i32 %_13)
-	%_15 = add i32 %_12, %_14
-	ret i32 %_15
-	br label %LABEL_5
-	LABEL_5:
-	unreachable
-}
-
 define  i32 @main()  {
-	%_16 = call i32 @fibonacci(i32 11)
-	call void @printi(i32 %_16)
+	%_7 = getelementptr { void (i32)*, i32 }, ptr null, i32 1
+	%_8 = ptrtoint ptr %_7 to i32
+
+	%_9 = call ptr @malloc(i32 %_8)
+	%_10 = getelementptr ptr, ptr %_9, i32 0
+	store void (i32)* @printi, ptr %_10
+	%_11 = getelementptr ptr, ptr %_9, i32 1
+	store i32 123, ptr %_11
+	%_12 = getelementptr ptr, ptr %_9, i32 0
+	%_13 = load void (i32)*, ptr %_12
+	%_14 = getelementptr ptr, ptr %_9, i32 1
+	%_15 = load i32, ptr %_14
+	call void %_13(i32 %_15)
 	ret i32 0
 	unreachable
 }

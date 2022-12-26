@@ -12,7 +12,7 @@ object LLType {
     override def toLL: String = "void"
 
   case class TFunction(retType: LLType, argTypeList: List[LLType]) extends LLType:
-    override def toLL: String = retType.toString + " " + argTypeList.toString.substring(4)
+    override def toLL: String = retType.toLL + " (" + Util.join(", ", argTypeList.map(t => t.toLL)) + ")" + "*"
 
   case class TPtr(contentType: LLType) extends LLType:
     override def toLL: String = contentType.toLL + "*"
@@ -25,4 +25,7 @@ object LLType {
 
   case class TStruct(elmTypeList: List[LLType]) extends AggregateType:
     override def toLL: String = "{ " + Util.join(", ", elmTypeList.map(t => t.toLL))  +" }"
+
+  case object TUnknown extends LLType:
+    override def toLL: String = "unknowntype"
 }

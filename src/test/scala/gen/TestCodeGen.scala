@@ -73,9 +73,30 @@ class TestCodeGen extends AnyFlatSpec {
       ),
     )
 
-    val ir = IR(b1, 0)
+    val b2 = Block(
+      printi,
+      Assign("main",
+        Fn(
+          List(),
+          Block(
+            Assign("arr", InitStruct(List(IRFunction(IRVoid, List(IRInt(32))), IRInt(32)))),
+            SetElementAt(Var("arr"), IntLiteral(0, 32), Var("printi")),
+            SetElementAt(Var("arr"), IntLiteral(1, 32), IntLiteral(123,32)),
+            Assign("printifn", GetElementAt(Var("arr"), IntLiteral(0, 32))),
+            Apply(
+              Var("printifn"),
+              List(GetElementAt(Var("arr"), IntLiteral(1, 32)))
+            ),
+            Return(IntLiteral(0))
+          ),
+          IRInt(32)
+        )
+      ),
+    )
+
+
+    val ir = IR(b2, 0)
     TypeAnalyzer(ir)
     CodeGen.emitProgram(ir, output)
-
   }
 }

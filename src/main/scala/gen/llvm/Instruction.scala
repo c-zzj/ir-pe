@@ -44,8 +44,8 @@ object Instruction {
     override def toLL: String = String.join(" ", STORE.asmCode, valType.toLL, value.toLL + ',', "ptr", pointer.toLL)
 
   case class GetElementPtr(res: LocalIdentifier, baseType: LLType, pointer: Identifier, indices: List[(LLType, Identifier)]) extends Instruction:
-    override def toLL: String = String.join(" ", res.toLL, GETELEMENTPTR.asmCode, baseType.toLL + ",",
-    "ptr", pointer.toLL + ",", Util.join(", ", indices.map((t, i) => t.toLL + i.toLL))
+    override def toLL: String = String.join(" ", res.toLL, "=", GETELEMENTPTR.asmCode, baseType.toLL + ",",
+    "ptr", pointer.toLL + ",", Util.join(", ", indices.map((t, i) => t.toLL + " " + i.toLL))
     )
 
   case class Cast(res: LocalIdentifier, opCode: CastOp, typeFrom: LLType, valueFrom: Identifier, typeTo: LLType) extends Instruction:

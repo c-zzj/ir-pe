@@ -146,7 +146,7 @@ class ExpGen(val pInfo: ProgramInfo, val curSection: Section, val fnInstructions
         val res = pInfo.getLocalId
         fnInstructions.addOne(Instruction.FunCall(Some(res), TOpaquePtr, GlobalIdentifier("malloc"), List((TInt(32), typeSize))))
         res
-      case e: StructArrLiteral => null
+      case e: StructArrLiteral => CodegenUtil.convertConstant(e)
       case e: GetElementAt =>
         val arrayPtr = gen(e.array)
         val index = gen(e.index)
@@ -172,7 +172,7 @@ class ExpGen(val pInfo: ProgramInfo, val curSection: Section, val fnInstructions
           arrayPtr,
           List((CodegenUtil.convertType(e.index.eType), index))
         ))
-        fnInstructions.addOne(Instruction.Store(CodegenUtil.convertType(e.eType), elm,elmPtr))
+        fnInstructions.addOne(Instruction.Store(CodegenUtil.convertType(e.elm.eType), elm,elmPtr))
         VoidConstant
       case e: Phi =>
         val res = pInfo.getLocalId
