@@ -25,7 +25,6 @@ object CodegenUtil {
       case IRFunction(retType, argTypeList) => LLType.TFunction(convertType(retType), argTypeList.map(convertType))
       case IRArray(elmType, size) => LLType.TOpaquePtr
       case IRStruct(elmTypeList) => LLType.TOpaquePtr
-      case IRClosure(retType, argTypeList) => LLType.TFunction(convertType(retType), argTypeList.map(convertType))
       case IRVoid => LLType.TVoid
 
   def convertContentType(irT: IRType): LLType =
@@ -36,6 +35,5 @@ object CodegenUtil {
         case Some(i) => LLType.TArray(i, convertType(elmType))
         case None => throw ShouldNotReach()
       case IRStruct(elmTypeList) => LLType.TStruct(elmTypeList.map(convertType))
-      case IRClosure(retType, argTypeList) => LLType.TFunction(convertType(retType), argTypeList.map(convertType))
       case IRVoid => LLType.TVoid
 }

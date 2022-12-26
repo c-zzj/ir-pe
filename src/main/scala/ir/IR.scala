@@ -91,11 +91,6 @@ class GetElementAt(var array: Exp, var index: Exp) extends Exp:
 class SetElementAt(var array: Exp, var index: Exp, var elm: Exp) extends Exp:
   override def eType: IRType = IRVoid
 
-class InitClosure(var env: List[NameTypePair], var fn: NameTypePair) extends Exp:
-  override def eType: IRType = fn.tp match
-    case t: IRFunction => IRClosure(t.retType, t.argTypeList)
-    case t: IRClosure => IRClosure(t.retType, t.argTypeList)
-    case _ => Undefined
 
 class Phi(var from: mutable.Map[Block, String] = mutable.HashMap.empty[Block, String], var tp: IRType = Undefined) extends Exp:
   override def eType: IRType = tp
@@ -114,7 +109,6 @@ case object IRVoid extends IRType
 
 case class IRFunction(retType: IRType, argTypeList: List[IRType]) extends IRType
 
-case class IRClosure(retType: IRType, argTypeList: List[IRType]) extends IRType
 
 case class IRArray(elmType: IRType, size: Option[Int] = None) extends IRType
 

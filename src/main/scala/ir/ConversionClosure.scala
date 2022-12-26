@@ -222,3 +222,12 @@ class ConversionClosure(ir: IR) {
   convertGlobal(ir.code)
   convertApply(ir.code)
 }
+
+class InitClosure(var env: List[NameTypePair],
+                  var fn: NameTypePair) extends Exp :
+  override def eType: IRType = fn.tp match
+    case t: IRFunction => IRClosure(t.retType, t.argTypeList)
+    case t: IRClosure => IRClosure(t.retType, t.argTypeList)
+    case _ => Undefined
+
+case class IRClosure(retType: IRType, argTypeList: List[IRType]) extends IRType
